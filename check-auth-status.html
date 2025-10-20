@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WAHA Integration Test</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #fff;
+        }
+        .status { padding: 15px; margin: 10px 0; border-radius: 8px; }
+        .error { background: #dc2626; }
+        .success { background: #16a34a; }
+        .warning { background: #f59e0b; }
+        button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background: #2563eb; }
+        pre {
+            background: #2a2a2a;
+            padding: 15px;
+            border-radius: 8px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 WAHA Multi-Tenant Integration Test</h1>
+
+    <div id="authStatus"></div>
+    <div id="results"></div>
+
+    <h3>Test Actions:</h3>
+    <button onclick="testAuth()">1. Check Auth Status</button>
+    <button onclick="testSessionStatus()">2. Test Session Status</button>
+    <button onclick="testQRCode()">3. Test QR Code</button>
+    <button onclick="openLogin()">4. Go to Login</button>
+
+    <script>
+        const resultsDiv = document.getElementById('results');
+        const authDiv = document.getElementById('authStatus');
+
+        async function testAuth() {
+            try {
+                const response = await fetch('http://localhost:3000/api/whatsapp/session-status');
+                const data = await response.json();
+
+                if (response.status === 401) {
+                    authDiv.innerHTML = `
+                        <div class="status warning">
+                            <strong>⚠️ Not Authenticated</strong><br>
+                            You need to login first!<br>
+                            <button onclick="openLogin()" style="margin-top: 10px">Go to Login Page</button>
+                        </div>
+                    `;
+                } else if (response.ok) {
+                    authDiv.innerHTML = `
+                        <div class="status success">
+                            <strong>✅ Authenticated!</strong><br>
+                            You can now test WAHA endpoints
+                        </div>
+                    `;
+                } else {
+                    authDiv.innerHTML = `
+                        <div class="status error">
+                            <strong>❌ Error: ${response.status}</strong><br>
+                            ${JSON.stringify(data, null, 2)}
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                authDiv.innerHTML = `
+                    <div class="status error">
+                        <strong>❌ Error</strong><br>
+                        ${error.message}
+                    </div>
+                `;
+            }
+        }
+
+        async function testSessionStatus() {
+            resultsDiv.innerHTML = '<p>Testing session status...</p>';
+            try {
+                const response = await fetch('http://localhost:3000/api/whatsapp/session-status');
+                const data = await response.json();
+
+                resultsDiv.innerHTML = `
+                    <h4>Session Status Response:</h4>
+                    <pre>${JSON.stringify(data, null, 2)}</pre>
+                    <p>Status Code: ${response.status}</p>
+                `;
+            } catch (error) {
+                resultsDiv.innerHTML = `<div class="status error">${error.message}</div>`;
+            }
+        }
+
+        async function testQRCode() {
+            resultsDiv.innerHTML = '<p>Testing QR code...</p>';
+            try {
+                const response = await fetch('http://localhost:3000/api/whatsapp/qr-code');
+                const data = await response.json();
+
+                resultsDiv.innerHTML = `
+                    <h4>QR Code Response:</h4>
+                    <pre>${JSON.stringify(data, null, 2)}</pre>
+                    <p>Status Code: ${response.status}</p>
+                `;
+            } catch (error) {
+                resultsDiv.innerHTML = `<div class="status error">${error.message}</div>`;
+            }
+        }
+
+        function openLogin() {
+            window.location.href = 'http://localhost:3000/login';
+        }
+
+        // Auto-check auth on load
+        testAuth();
+    </script>
+</body>
+</html>
