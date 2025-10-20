@@ -1,12 +1,25 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
-import { EyeIcon, EyeSlashIcon, UserPlusIcon, CheckCircleIcon } from '@heroicons/react/24/outline'
+import { EyeIcon, EyeSlashIcon, UserPlusIcon, CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/outline'
 import { toast } from 'react-hot-toast'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
+
+interface Invitation {
+  id: string
+  organization_id: string
+  email: string
+  role: string
+  status: string
+  expires_at: string
+  token: string
+  organization: {
+    name: string
+  }
+}
 
 export default function RegisterPage() {
   const [email, setEmail] = useState('')
@@ -16,11 +29,87 @@ export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [checkingInvitation, setCheckingInvitation] = useState(true)
+  const [invitation, setInvitation] = useState<Invitation | null>(null)
+  const [invitationError, setInvitationError] = useState<string | null>(null)
+
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const inviteToken = searchParams.get('token')
   const supabase = createClient()
+
+  useEffect(() => {
+    checkInvitation()
+  }, [inviteToken])
+
+  const checkInvitation = async () => {
+    if (!inviteToken) {
+      setInvitationError('Registrierung ist nur auf Einladung möglich. Bitte verwenden Sie den Link aus Ihrer Einladungs-E-Mail.')
+      setCheckingInvitation(false)
+      return
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('organization_invitations')
+        .select(`
+          id,
+          organization_id,
+          email,
+          role,
+          status,
+          expires_at,
+          token,
+          organization:organizations(name)
+        `)
+        .eq('token', inviteToken)
+        .single()
+
+      if (error || !data) {
+        setInvitationError('Einladung nicht gefunden oder ungültig.')
+        setCheckingInvitation(false)
+        return
+      }
+
+      // Check if invitation is expired
+      const now = new Date()
+      const expiresAt = new Date(data.expires_at)
+
+      if (now > expiresAt) {
+        setInvitationError('Diese Einladung ist abgelaufen. Bitte fordern Sie eine neue Einladung an.')
+        setCheckingInvitation(false)
+        return
+      }
+
+      if (data.status !== 'pending') {
+        setInvitationError(`Diese Einladung wurde bereits ${data.status === 'accepted' ? 'angenommen' : 'abgelehnt'}.`)
+        setCheckingInvitation(false)
+        return
+      }
+
+      // Set invitation data and pre-fill email
+      setInvitation(data as any)
+      setEmail(data.email)
+      setCheckingInvitation(false)
+    } catch (error) {
+      console.error('Error checking invitation:', error)
+      setInvitationError('Fehler beim Überprüfen der Einladung.')
+      setCheckingInvitation(false)
+    }
+  }
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    if (!invitation) {
+      toast.error('Keine gültige Einladung gefunden')
+      return
+    }
+
+    if (email.toLowerCase() !== invitation.email.toLowerCase()) {
+      toast.error('Die E-Mail-Adresse muss mit der Einladung übereinstimmen')
+      return
+    }
 
     if (password !== confirmPassword) {
       toast.error('Passwörter stimmen nicht überein')
@@ -35,7 +124,7 @@ export default function RegisterPage() {
     setLoading(true)
 
     try {
-      const { error } = await supabase.auth.signUp({
+      const { data: authData, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -47,12 +136,13 @@ export default function RegisterPage() {
 
       if (error) {
         toast.error('Registrierung fehlgeschlagen: ' + error.message)
-      } else {
-        toast.success('Registrierung erfolgreich! Bitte prüfen Sie Ihre E-Mail.')
-        router.push('/login')
+      } else if (authData.user) {
+        toast.success(`Willkommen bei ${invitation.organization.name}!`)
+        router.push('/dashboard')
       }
-    } catch (error) {
-      toast.error('Ein Fehler ist aufgetreten')
+    } catch (error: any) {
+      console.error('Registration error:', error)
+      toast.error('Ein Fehler ist aufgetreten: ' + (error?.message || 'Unbekannter Fehler'))
     } finally {
       setLoading(false)
     }
@@ -75,6 +165,47 @@ export default function RegisterPage() {
   }
 
   const passwordStrength = getPasswordStrength()
+
+  // Show loading state while checking invitation
+  if (checkingInvitation) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-purple-50 dark:from-gray-900 dark:via-blue-900 dark:to-purple-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="loading-dots mx-auto mb-4">
+            <div></div>
+            <div></div>
+            <div></div>
+          </div>
+          <p className="text-gray-600 dark:text-gray-400">Überprüfe Einladung...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Show error state if invitation is invalid
+  if (invitationError) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-purple-50 dark:from-gray-900 dark:via-blue-900 dark:to-purple-900 flex items-center justify-center p-4">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="max-w-md w-full"
+        >
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-8 text-center">
+            <XCircleIcon className="h-16 w-16 text-red-500 mx-auto mb-4" />
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Registrierung nicht möglich</h1>
+            <p className="text-gray-600 dark:text-gray-400 mb-6">{invitationError}</p>
+            <Link
+              href="/login"
+              className="inline-block px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:shadow-lg transition-all"
+            >
+              Zur Anmeldung
+            </Link>
+          </div>
+        </motion.div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-purple-50 dark:from-gray-900 dark:via-blue-900 dark:to-purple-900 flex items-center justify-center p-4 relative overflow-hidden">
@@ -114,8 +245,15 @@ export default function RegisterPage() {
                 Konto erstellen
               </h2>
               <p className="text-gray-600 dark:text-gray-400">
-                Starten Sie Ihre Reise mit uns
+                Registrierung für {invitation?.organization.name}
               </p>
+              {invitation && (
+                <div className="mt-3 px-4 py-2 bg-blue-50 dark:bg-blue-900/30 rounded-lg">
+                  <p className="text-xs text-blue-700 dark:text-blue-300">
+                    Sie wurden als <strong>{invitation.role === 'admin' ? 'Administrator' : invitation.role === 'member' ? 'Mitglied' : invitation.role}</strong> eingeladen
+                  </p>
+                </div>
+              )}
             </motion.div>
 
             {/* Form */}
@@ -150,10 +288,14 @@ export default function RegisterPage() {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700/50 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:focus:ring-purple-500 dark:focus:border-purple-500 transition-all duration-300 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
+                  className="w-full px-4 py-3 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-xl text-gray-900 dark:text-white cursor-not-allowed opacity-75"
                   placeholder="ihre@email.com"
+                  disabled
                   required
                 />
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  Diese E-Mail-Adresse ist durch die Einladung festgelegt
+                </p>
               </div>
 
               <div>

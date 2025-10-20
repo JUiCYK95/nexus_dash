@@ -162,14 +162,11 @@ export default function LoginPage() {
               transition={{ duration: 0.6, delay: 0.4 }}
               className="text-center pt-4 border-t border-gray-200 dark:border-gray-700"
             >
-              <p className="text-gray-600 dark:text-gray-400">
-                Noch kein Konto?{' '}
-                <Link
-                  href="/register"
-                  className="text-blue-600 dark:text-blue-400 hover:text-purple-600 dark:hover:text-purple-400 font-semibold transition-colors"
-                >
-                  Registrieren
-                </Link>
+              <p className="text-gray-600 dark:text-gray-400 text-sm">
+                Noch kein Konto? Die Registrierung ist nur auf Einladung möglich.
+              </p>
+              <p className="text-gray-500 dark:text-gray-500 text-xs mt-2">
+                Bitte verwenden Sie den Einladungslink aus Ihrer E-Mail.
               </p>
             </motion.div>
           </div>

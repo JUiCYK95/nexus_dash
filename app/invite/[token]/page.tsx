@@ -271,21 +271,29 @@ export default function InvitePage() {
 
           {!user ? (
             <div className="space-y-4">
-              <p className="text-sm text-gray-600 text-center">
-                Sie müssen angemeldet sein, um diese Einladung anzunehmen.
+              <p className="text-sm text-gray-600 text-center mb-4">
+                Sie müssen ein Konto erstellen oder sich anmelden, um diese Einladung anzunehmen.
               </p>
               <div className="space-y-3">
                 <Link
-                  href={`/login?redirect=/invite/${token}`}
-                  className="w-full flex items-center justify-center px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  href={`/register?token=${token}`}
+                  className="w-full flex items-center justify-center px-4 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:shadow-lg transition-all font-semibold"
                 >
-                  Anmelden
+                  Konto erstellen
                 </Link>
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-gray-300"></div>
+                  </div>
+                  <div className="relative flex justify-center text-sm">
+                    <span className="px-2 bg-white text-gray-500">oder</span>
+                  </div>
+                </div>
                 <Link
-                  href={`/register?redirect=/invite/${token}`}
+                  href={`/login?redirect=/invite/${token}`}
                   className="w-full flex items-center justify-center px-4 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
                 >
-                  Registrieren
+                  Anmelden (Bestehendes Konto)
                 </Link>
               </div>
             </div>
