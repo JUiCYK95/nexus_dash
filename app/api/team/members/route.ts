@@ -3,13 +3,14 @@
 // =============================================
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase'
-import { 
-  withPermission, 
+import { createServerSupabaseClient } from '@/lib/supabase-server'
+import { supabaseAdmin } from '@/lib/supabase-admin'
+import {
+  withPermission,
   withMultiplePermissions,
-  AuthenticatedRequest, 
-  createApiResponse, 
-  handleApiError 
+  AuthenticatedRequest,
+  createApiResponse,
+  handleApiError
 } from '@/lib/api-middleware'
 import { logAuditEvent, canManageRole } from '@/lib/permissions'
 import { MemberRole } from '@/types/tenant'
@@ -21,13 +22,20 @@ import { MemberRole } from '@/types/tenant'
 export async function GET(request: NextRequest) {
   return withPermission('manage_members')(request, async (req: AuthenticatedRequest) => {
     try {
-      const supabase = createClient()
+      const supabase = createServerSupabaseClient(request)
       const { organizationId } = req.auth!
 
-      // Get team members
+      // Get team members with user info from public.users
       const { data: members, error } = await supabase
         .from('organization_members')
-        .select('*')
+        .select(`
+          id,
+          user_id,
+          role,
+          joined_at,
+          is_active,
+          permissions
+        `)
         .eq('organization_id', organizationId)
         .eq('is_active', true)
         .order('joined_at', { ascending: false })
@@ -37,41 +45,60 @@ export async function GET(request: NextRequest) {
         return createApiResponse(false, undefined, 'Failed to fetch team members', 500)
       }
 
-      // Fetch user details from auth.users
+      // Get auth user data for all team members
       const userIds = members?.map(m => m.user_id) || []
-      const { data: users, error: usersError } = await supabase.auth.admin.listUsers()
+      const formattedMembers: any[] = []
 
-      if (usersError) {
-        console.error('Error fetching user details:', usersError)
-      }
+      for (const member of members || []) {
+        try {
+          // Get user data from auth.users using admin client
+          const { data: { user: authUser }, error: authError } = await supabaseAdmin.auth.admin.getUserById(member.user_id)
 
-      // Create a map of user details
-      const userMap = new Map(
-        users?.users?.map(u => [
-          u.id,
-          {
-            email: u.email || 'Unknown',
-            name: u.user_metadata?.full_name || u.user_metadata?.name || u.email?.split('@')[0] || 'User'
+          let email = 'Unknown'
+          let name = 'Unknown'
+
+          if (authUser && !authError) {
+            email = authUser.email || 'Unknown'
+
+            // Try to get name from both user_metadata and raw_user_meta_data
+            const metadata = authUser.user_metadata || {}
+            const rawMetadata = (authUser as any).raw_user_meta_data || {}
+
+            // Try multiple metadata fields for the name
+            name = metadata.full_name ||
+                   metadata.name ||
+                   metadata.display_name ||
+                   rawMetadata.full_name ||
+                   rawMetadata.name ||
+                   rawMetadata.display_name ||
+                   email.split('@')[0]
+          } else {
+            console.error(`Error fetching user ${member.user_id}:`, authError)
           }
-        ]) || []
-      )
 
-      const formattedMembers = members?.map(member => {
-        const userDetails = userMap.get(member.user_id) || {
-          email: 'Unknown',
-          name: `User ${member.user_id.substring(0, 8)}`
+          formattedMembers.push({
+            id: member.id,
+            userId: member.user_id,
+            email,
+            name,
+            role: member.role,
+            joinedAt: member.joined_at,
+            isActive: member.is_active,
+          })
+        } catch (error) {
+          console.error(`Failed to fetch user ${member.user_id}:`, error)
+          // Add member with unknown data
+          formattedMembers.push({
+            id: member.id,
+            userId: member.user_id,
+            email: 'Unknown',
+            name: 'Unknown',
+            role: member.role,
+            joinedAt: member.joined_at,
+            isActive: member.is_active,
+          })
         }
-
-        return {
-          id: member.id,
-          userId: member.user_id,
-          email: userDetails.email,
-          name: userDetails.name,
-          role: member.role,
-          joinedAt: member.joined_at,
-          isActive: member.is_active,
-        }
-      }) || []
+      }
 
       return createApiResponse(true, { members: formattedMembers })
 
@@ -87,7 +114,7 @@ export async function GET(request: NextRequest) {
 // =============================================
 
 export async function POST(request: NextRequest) {
-  return withPermission('team:manage')(request, async (req: AuthenticatedRequest) => {
+  return withPermission('manage_members')(request, async (req: AuthenticatedRequest) => {
     try {
       const { email, role } = await request.json()
       const { userId, organizationId } = req.auth!
@@ -101,7 +128,7 @@ export async function POST(request: NextRequest) {
         return createApiResponse(false, undefined, 'Invalid role', 400)
       }
 
-      const supabase = createClient()
+      const supabase = createServerSupabaseClient(request)
 
       // Get current user's role to check if they can assign this role
       const { data: currentMember, error: memberError } = await supabase
@@ -238,7 +265,7 @@ export async function POST(request: NextRequest) {
 // =============================================
 
 export async function PUT(request: NextRequest) {
-  return withPermission('team:manage')(request, async (req: AuthenticatedRequest) => {
+  return withPermission('manage_members')(request, async (req: AuthenticatedRequest) => {
     try {
       const { memberId, newRole } = await request.json()
       const { userId, organizationId, role: currentUserRole } = req.auth!
@@ -252,7 +279,7 @@ export async function PUT(request: NextRequest) {
         return createApiResponse(false, undefined, 'Invalid role', 400)
       }
 
-      const supabase = createClient()
+      const supabase = createServerSupabaseClient(request)
 
       // Get target member details
       const { data: targetMember, error: memberError } = await supabase
@@ -319,7 +346,7 @@ export async function PUT(request: NextRequest) {
 // =============================================
 
 export async function DELETE(request: NextRequest) {
-  return withPermission('team:manage')(request, async (req: AuthenticatedRequest) => {
+  return withPermission('manage_members')(request, async (req: AuthenticatedRequest) => {
     try {
       const { searchParams } = new URL(request.url)
       const memberId = searchParams.get('memberId')
@@ -329,7 +356,7 @@ export async function DELETE(request: NextRequest) {
         return createApiResponse(false, undefined, 'Member ID is required', 400)
       }
 
-      const supabase = createClient()
+      const supabase = createServerSupabaseClient(request)
 
       // Get target member details
       const { data: targetMember, error: memberError } = await supabase

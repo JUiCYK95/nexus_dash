@@ -3,7 +3,7 @@
 // =============================================
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase'
+import { createServerSupabaseClient } from '@/lib/supabase-server'
 import { checkUserPermission, getUserAuthContext, logAuditEvent } from '@/lib/permissions'
 import { MemberPermissions } from '@/types/tenant'
 
@@ -34,7 +34,7 @@ export async function withAuth(
   handler: (req: AuthenticatedRequest) => Promise<NextResponse>
 ): Promise<NextResponse> {
   try {
-    const supabase = createClient()
+    const supabase = createServerSupabaseClient(request)
 
     // Get user from Supabase auth
     const { data: { user }, error: authError } = await supabase.auth.getUser()
@@ -47,7 +47,7 @@ export async function withAuth(
     }
 
     // Extract organization ID from request
-    const organizationId = await extractOrganizationId(request)
+    const organizationId = await extractOrganizationId(request, supabase, user.id)
 
     if (!organizationId) {
       return NextResponse.json(
@@ -217,25 +217,29 @@ export function withRole(minRole: 'viewer' | 'member' | 'admin' | 'owner') {
 // UTILITY FUNCTIONS
 // =============================================
 
-async function extractOrganizationId(request: NextRequest): Promise<string | null> {
+async function extractOrganizationId(
+  request: NextRequest,
+  supabase: any,
+  userId: string
+): Promise<string | null> {
   // Try to get organization ID from various sources
-  
+
   // 1. From URL parameters
   const url = new URL(request.url)
-  const orgIdFromParams = url.searchParams.get('organizationId') || 
+  const orgIdFromParams = url.searchParams.get('organizationId') ||
                          url.searchParams.get('org_id') ||
                          url.searchParams.get('organization_id')
-  
+
   if (orgIdFromParams) {
     return orgIdFromParams
   }
 
   // 2. From path segments (e.g., /api/organizations/{id}/...)
   const pathSegments = url.pathname.split('/')
-  const orgIndex = pathSegments.findIndex(segment => 
+  const orgIndex = pathSegments.findIndex(segment =>
     segment === 'organizations' || segment === 'org'
   )
-  
+
   if (orgIndex !== -1 && pathSegments[orgIndex + 1]) {
     return pathSegments[orgIndex + 1]
   }
@@ -251,7 +255,7 @@ async function extractOrganizationId(request: NextRequest): Promise<string | nul
     try {
       const clonedRequest = request.clone()
       const body = await clonedRequest.json()
-      
+
       if (body.organizationId) {
         return body.organizationId
       }
@@ -265,24 +269,18 @@ async function extractOrganizationId(request: NextRequest): Promise<string | nul
 
   // 5. If no organization ID found, try to get user's default organization
   try {
-    const supabase = createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    
-    if (authError || !user) {
-      return null
-    }
-
     // Get user's first active organization
     const { data: membership, error: membershipError } = await supabase
       .from('organization_members')
       .select('organization_id')
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .eq('is_active', true)
       .order('joined_at', { ascending: false })
       .limit(1)
       .single()
 
     if (membershipError || !membership) {
+      console.error('Error getting user organization:', membershipError)
       return null
     }
 

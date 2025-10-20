@@ -50,10 +50,13 @@ export async function checkUserPermission(
     }
 
     const role = membership.role as MemberRole
-    const permissions = DEFAULT_PERMISSIONS[role] || []
+    const rolePermissions = DEFAULT_PERMISSIONS[role] || {}
+
+    // Check if the specific permission is granted
+    const hasPermission = rolePermissions[permission] === true
 
     return {
-      hasPermission: permissions.includes(permission),
+      hasPermission,
       role,
       organizationId,
     }
@@ -86,7 +89,12 @@ export async function getUserAuthContext(
     }
 
     const role = membership.role as MemberRole
-    const permissions = DEFAULT_PERMISSIONS[role] || []
+    const rolePermissions = DEFAULT_PERMISSIONS[role] || {}
+
+    // Convert permissions object to array of permission keys where value is true
+    const permissions = Object.entries(rolePermissions)
+      .filter(([_, value]) => value === true)
+      .map(([key, _]) => key as Permission)
 
     return {
       userId,
