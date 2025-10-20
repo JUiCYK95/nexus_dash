@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
       const supabase = createClient()
       const { organizationId } = req.auth!
 
-      // Get team members with user details
+      // Get team members
       const { data: members, error } = await supabase
         .from('organization_members')
         .select('*')
@@ -37,15 +37,41 @@ export async function GET(request: NextRequest) {
         return createApiResponse(false, undefined, 'Failed to fetch team members', 500)
       }
 
-      const formattedMembers = members?.map(member => ({
-        id: member.id,
-        userId: member.user_id,
-        email: `user${member.user_id}@example.com`, // Mock email since we can't fetch user data
-        name: `Team Member ${member.user_id}`, // Mock name since we can't fetch user data
-        role: member.role,
-        joinedAt: member.joined_at,
-        isActive: member.is_active,
-      })) || []
+      // Fetch user details from auth.users
+      const userIds = members?.map(m => m.user_id) || []
+      const { data: users, error: usersError } = await supabase.auth.admin.listUsers()
+
+      if (usersError) {
+        console.error('Error fetching user details:', usersError)
+      }
+
+      // Create a map of user details
+      const userMap = new Map(
+        users?.users?.map(u => [
+          u.id,
+          {
+            email: u.email || 'Unknown',
+            name: u.user_metadata?.full_name || u.user_metadata?.name || u.email?.split('@')[0] || 'User'
+          }
+        ]) || []
+      )
+
+      const formattedMembers = members?.map(member => {
+        const userDetails = userMap.get(member.user_id) || {
+          email: 'Unknown',
+          name: `User ${member.user_id.substring(0, 8)}`
+        }
+
+        return {
+          id: member.id,
+          userId: member.user_id,
+          email: userDetails.email,
+          name: userDetails.name,
+          role: member.role,
+          joinedAt: member.joined_at,
+          isActive: member.is_active,
+        }
+      }) || []
 
       return createApiResponse(true, { members: formattedMembers })
 

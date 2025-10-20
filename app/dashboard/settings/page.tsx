@@ -221,30 +221,19 @@ export default function SettingsPage() {
   // Team Management Functions
   const loadTeamMembers = async () => {
     if (!organization) return
-    
+
     setLoadingMembers(true)
     try {
-      const { data, error } = await supabase
-        .from('organization_members')
-        .select(`
-          id,
-          user_id,
-          role,
-          is_active,
-          joined_at,
-          permissions
-        `)
-        .eq('organization_id', organization.id)
-        .eq('is_active', true)
-        .order('joined_at', { ascending: false })
+      const response = await fetch('/api/team/members')
+      const result = await response.json()
 
-      if (error) {
-        console.error('Error loading team members:', error)
+      if (!response.ok || !result.success) {
+        console.error('Error loading team members:', result.error)
         toast.error('Fehler beim Laden der Teammitglieder')
         return
       }
 
-      setTeamMembers(data || [])
+      setTeamMembers(result.data.members || [])
     } catch (error) {
       console.error('Error loading team members:', error)
       toast.error('Fehler beim Laden der Teammitglieder')
@@ -718,25 +707,28 @@ export default function SettingsPage() {
                       <div className="flex items-center space-x-3">
                         <div className="w-10 h-10 bg-gradient-cosmic rounded-xl flex items-center justify-center">
                           <span className="text-white font-bold">
-                            {teamMember.user_id.substring(0, 2).toUpperCase()}
+                            {(teamMember.name || teamMember.email || 'U').substring(0, 2).toUpperCase()}
                           </span>
                         </div>
                         <div>
                           <p className="font-medium text-white">
-                            Benutzer {teamMember.user_id.substring(0, 8)}
+                            {teamMember.name || teamMember.email || `User ${teamMember.userId?.substring(0, 8)}`}
                           </p>
-                          <div className="flex items-center space-x-2">
+                          <p className="text-xs text-gray-500">
+                            {teamMember.email}
+                          </p>
+                          <div className="flex items-center space-x-2 mt-1">
                             <span className={`text-xs font-medium px-2 py-1 rounded-full ${getRoleBadgeColor(teamMember.role)}`}>
                               {getRoleDisplayName(teamMember.role)}
                             </span>
                             <span className="text-xs text-gray-500">
-                              Beigetreten: {new Date(teamMember.joined_at).toLocaleDateString('de-DE')}
+                              Beigetreten: {new Date(teamMember.joinedAt).toLocaleDateString('de-DE')}
                             </span>
                           </div>
                         </div>
                       </div>
-                      
-                      {canPerform('manage_members') && teamMember.user_id !== member?.user_id && (
+
+                      {canPerform('manage_members') && teamMember.userId !== member?.user_id && (
                         <div className="flex items-center space-x-2">
                           <select
                             value={teamMember.role}
