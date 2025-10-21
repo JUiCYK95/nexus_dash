@@ -18,6 +18,7 @@ import { createClient } from '@/lib/supabase'
 import DashboardLayout from '@/components/layout/DashboardLayout'
 import { toast } from 'react-hot-toast'
 import { useRouter } from 'next/navigation'
+import { fetchWithOrg } from '@/lib/api-utils'
 
 // Generate mock contacts from automotive chats data
 const getMockContactsFromChats = () => {
@@ -102,7 +103,7 @@ export default function ContactsPage() {
   const fetchContacts = async () => {
     try {
       // Fetch real WhatsApp contacts from WAHA
-      const response = await fetch('/api/whatsapp/contacts')
+      const response = await fetchWithOrg('/api/whatsapp/contacts')
       const data = await response.json()
 
       if (data.success && data.contacts) {

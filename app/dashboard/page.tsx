@@ -14,6 +14,7 @@ import AnimatedStatCard from '@/components/dashboard/AnimatedStatCard'
 import SkeletonLoader from '@/components/ui/SkeletonLoader'
 import ParallaxContainer from '@/components/ui/ParallaxContainer'
 import { ChatBubbleLeftRightIcon, UserGroupIcon, ChartBarIcon } from '@heroicons/react/24/outline'
+import { fetchWithOrg } from '@/lib/api-utils'
 
 export default function DashboardPage() {
   const [user, setUser] = useState<any>(null)
@@ -48,7 +49,7 @@ export default function DashboardPage() {
   const fetchDashboardStats = async () => {
     try {
       // Fetch chats overview from WAHA - more efficient, includes chat info and last message
-      const chatsResponse = await fetch('/api/whatsapp/chats/overview')
+      const chatsResponse = await fetchWithOrg('/api/whatsapp/chats/overview')
       const chatsData = await chatsResponse.json()
 
       let totalMessages = 0
@@ -65,7 +66,7 @@ export default function DashboardPage() {
 
         const chatPromises = chatsToAnalyze.map(async (chat: any) => {
           try {
-            const messagesResponse = await fetch(`/api/whatsapp/chats/${chat.id}/messages?limit=100`)
+            const messagesResponse = await fetchWithOrg(`/api/whatsapp/chats/${chat.id}/messages?limit=100`)
             const messagesData = await messagesResponse.json()
 
             if (messagesData.success && messagesData.messages) {

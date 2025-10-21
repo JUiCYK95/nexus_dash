@@ -6,6 +6,7 @@ import DashboardLayout from '@/components/layout/DashboardLayout'
 import ChatSidebar from '@/components/chat/ChatSidebar'
 import ChatWindow from '@/components/chat/ChatWindow'
 import { createClient } from '@/lib/supabase'
+import { fetchWithOrg } from '@/lib/api-utils'
 
 function ChatPageContent() {
   const [selectedContact, setSelectedContact] = useState<any>(null)
@@ -32,7 +33,7 @@ function ChatPageContent() {
   const fetchContacts = async () => {
     try {
       // Fetch real WhatsApp chats from WAHA
-      const response = await fetch('/api/whatsapp/chats')
+      const response = await fetchWithOrg('/api/whatsapp/chats')
       const data = await response.json()
 
       if (data.success && data.chats && data.chats.length > 0) {

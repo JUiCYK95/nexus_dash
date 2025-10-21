@@ -16,6 +16,7 @@ import {
 } from '@heroicons/react/24/outline'
 import { createClient } from '@/lib/supabase'
 import { toast } from 'react-hot-toast'
+import { fetchWithOrg } from '@/lib/api-utils'
 
 interface ChatWindowProps {
   selectedContact: any
@@ -54,7 +55,7 @@ export default function ChatWindow({ selectedContact, onContactUpdate, onBack }:
     setLoading(true)
     try {
       // Fetch messages from WAHA API
-      const response = await fetch(`/api/whatsapp/chats/${selectedContact.id}/messages?limit=100`)
+      const response = await fetchWithOrg(`/api/whatsapp/chats/${selectedContact.id}/messages?limit=100`)
       const data = await response.json()
 
       if (data.success && data.messages) {
@@ -148,15 +149,14 @@ export default function ChatWindow({ selectedContact, onContactUpdate, onBack }:
       setMessage('')
 
       // Send message via API
-      const response = await fetch('/api/whatsapp/send-message', {
+      const response = await fetchWithOrg('/api/whatsapp/send-message', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           contactId: selectedContact.id,
-          message: messageToSend,
-          sessionName: 'default'
+          message: messageToSend
         })
       })
 

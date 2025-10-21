@@ -8,11 +8,13 @@ const DEFAULT_WAHA_API_KEY = process.env.WAHA_API_KEY
 class WAHAClient {
   private baseURL: string
   private apiKey?: string
+  public sessionName?: string
 
-  constructor(baseURL?: string, apiKey?: string) {
+  constructor(baseURL?: string, apiKey?: string, sessionName?: string) {
     // Remove trailing slash to prevent double slashes in URLs
     this.baseURL = (baseURL || DEFAULT_WAHA_API_URL).replace(/\/$/, '')
     this.apiKey = apiKey || DEFAULT_WAHA_API_KEY
+    this.sessionName = sessionName
   }
 
   private getHeaders() {
@@ -29,8 +31,8 @@ class WAHAClient {
   }
 
   // Static method to create client for a specific organization
-  static async forOrganization(organizationId: string): Promise<WAHAClient> {
-    const supabase = createServerSupabaseClient()
+  static async forOrganization(organizationId: string, request?: any): Promise<WAHAClient> {
+    const supabase = createServerSupabaseClient(request)
 
     // Get organization WAHA configuration
     const { data: org, error } = await supabase
@@ -47,7 +49,7 @@ class WAHAClient {
       throw new Error('WAHA API URL not configured for this organization. Please configure it in Settings.')
     }
 
-    return new WAHAClient(org.waha_api_url, org.waha_api_key)
+    return new WAHAClient(org.waha_api_url, org.waha_api_key, org.waha_session_name)
   }
 
   // Session Management

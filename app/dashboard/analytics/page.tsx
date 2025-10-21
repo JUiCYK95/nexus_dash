@@ -11,6 +11,7 @@ import TopTopicsAnalytics from '@/components/analytics/TopTopicsAnalytics'
 import { createClient } from '@/lib/supabase'
 import { toast } from 'react-hot-toast'
 import { ArrowDownTrayIcon } from '@heroicons/react/24/outline'
+import { fetchWithOrg } from '@/lib/api-utils'
 
 export default function AnalyticsPage() {
   const [analyticsData, setAnalyticsData] = useState({
@@ -35,7 +36,7 @@ export default function AnalyticsPage() {
     setLoading(true)
     try {
       // Fetch chats overview from WAHA
-      const chatsResponse = await fetch('/api/whatsapp/chats/overview')
+      const chatsResponse = await fetchWithOrg('/api/whatsapp/chats/overview')
       const chatsData = await chatsResponse.json()
 
       let totalMessages = 0

@@ -11,9 +11,9 @@ import { enforceUsageLimit, trackUsage } from '@/lib/usage-tracker'
 
 export async function POST(request: NextRequest) {
   return withApiProtection({
-    permission: 'messages:send',
+    permission: 'send_messages',
     usageMetric: 'messages_sent',
-    rateLimit: { maxRequests: 100, windowMs: 60000 } // 100 requests per minute
+    rateLimit: { maxRequests: 1000, windowMs: 60000 } // 1000 requests per minute
   })(request, async (req: AuthenticatedRequest) => {
     try {
       const body = await request.json()
@@ -54,10 +54,19 @@ export async function POST(request: NextRequest) {
       let messageResponse
       try {
         // Create WAHA client for this organization
-        const wahaClient = await WAHAClient.forOrganization(organizationId)
+        const wahaClient = await WAHAClient.forOrganization(organizationId, request)
+
+        // Use the session name from the organization settings
+        const actualSessionName = wahaClient.sessionName || sessionName || 'default'
+        console.log('📤 Sending message:', {
+          organizationId,
+          sessionName: actualSessionName,
+          contactId,
+          phoneNumber: targetPhone
+        })
 
         const wahaResponse = await wahaClient.sendTextMessage(
-          sessionName,
+          actualSessionName,
           targetPhone,
           message
         )

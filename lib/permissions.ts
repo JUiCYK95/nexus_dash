@@ -3,6 +3,7 @@
 // =============================================
 
 import { createClient } from '@/lib/supabase'
+import { createServerSupabaseClient } from '@/lib/supabase-server'
 import { MemberRole, MemberPermissions, DEFAULT_PERMISSIONS } from '@/types/tenant'
 
 type Permission = keyof MemberPermissions
@@ -71,10 +72,12 @@ export async function checkUserPermission(
 
 export async function getUserAuthContext(
   userId: string,
-  organizationId: string
+  organizationId: string,
+  request?: any
 ): Promise<AuthContext | null> {
   try {
-    const supabase = createClient()
+    // Use server client if request is provided (server-side), otherwise use regular client (client-side)
+    const supabase = request ? createServerSupabaseClient(request) : createClient()
 
     const { data: membership, error } = await supabase
       .from('organization_members')
@@ -85,6 +88,7 @@ export async function getUserAuthContext(
       .single()
 
     if (error || !membership) {
+      console.error('getUserAuthContext error:', { error, userId, organizationId })
       return null
     }
 
@@ -95,6 +99,8 @@ export async function getUserAuthContext(
     const permissions = Object.entries(rolePermissions)
       .filter(([_, value]) => value === true)
       .map(([key, _]) => key as Permission)
+
+    console.log('✅ Auth context created:', { userId, organizationId, role, permissionsCount: permissions.length })
 
     return {
       userId,

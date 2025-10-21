@@ -57,7 +57,7 @@ export async function withAuth(
     }
 
     // Get user's auth context for this organization
-    const authContext = await getUserAuthContext(user.id, organizationId)
+    const authContext = await getUserAuthContext(user.id, organizationId, request)
 
     if (!authContext) {
       return NextResponse.json(
@@ -448,28 +448,111 @@ export function withApiProtection({
     request: NextRequest,
     handler: (req: AuthenticatedRequest) => Promise<NextResponse>
   ): Promise<NextResponse> {
-    let middleware = withAuth
+    // Run withAuth once and then apply all other checks
+    return withAuth(request, async (req: AuthenticatedRequest) => {
+      if (!req.auth) {
+        return NextResponse.json(
+          { success: false, error: 'Authentication context missing' },
+          { status: 500 }
+        )
+      }
 
-    if (permission) {
-      middleware = withPermission(permission)
-    } else if (role) {
-      middleware = withRole(role)
-    }
+      const { userId, organizationId, role: userRole, permissions } = req.auth
 
-    if (rateLimit) {
-      const rateLimitMiddleware = withRateLimit(rateLimit.maxRequests, rateLimit.windowMs)
-      const originalMiddleware = middleware
-      middleware = async (req, handler) => 
-        rateLimitMiddleware(req, (req) => originalMiddleware(req, handler))
-    }
+      // Check permissions if required
+      if (permission && !permissions.includes(permission)) {
+        await logAuditEvent(
+          organizationId,
+          userId,
+          'unauthorized_access_attempt',
+          {
+            requiredPermission: permission,
+            userPermissions: permissions,
+            endpoint: req.url
+          }
+        )
 
-    if (usageMetric) {
-      const usageMiddleware = withUsageTracking(usageMetric)
-      const originalMiddleware = middleware
-      middleware = async (req, handler) => 
-        usageMiddleware(req, (req) => originalMiddleware(req, handler))
-    }
+        return NextResponse.json(
+          { success: false, error: 'Insufficient permissions' },
+          { status: 403 }
+        )
+      }
 
-    return middleware(request, handler)
+      // Check role if required
+      if (role) {
+        const roleHierarchy = { viewer: 1, member: 2, admin: 3, owner: 4 }
+        const userRoleLevel = roleHierarchy[userRole as keyof typeof roleHierarchy] || 0
+        const requiredRoleLevel = roleHierarchy[role]
+
+        if (userRoleLevel < requiredRoleLevel) {
+          await logAuditEvent(
+            organizationId,
+            userId,
+            'unauthorized_role_access_attempt',
+            {
+              userRole,
+              requiredRole: role,
+              endpoint: req.url
+            }
+          )
+
+          return NextResponse.json(
+            { success: false, error: `Role '${role}' or higher required` },
+            { status: 403 }
+          )
+        }
+      }
+
+      // Check rate limit if required
+      if (rateLimit) {
+        const key = `${organizationId}:${userId}`
+        const now = Date.now()
+
+        let rateLimitEntry = rateLimitStore.get(key)
+
+        if (!rateLimitEntry || now > rateLimitEntry.resetTime) {
+          rateLimitEntry = { count: 0, resetTime: now + rateLimit.windowMs }
+          rateLimitStore.set(key, rateLimitEntry)
+        }
+
+        if (rateLimitEntry.count >= rateLimit.maxRequests) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: 'Rate limit exceeded',
+              retryAfter: Math.ceil((rateLimitEntry.resetTime - now) / 1000)
+            },
+            {
+              status: 429,
+              headers: {
+                'Retry-After': Math.ceil((rateLimitEntry.resetTime - now) / 1000).toString()
+              }
+            }
+          )
+        }
+
+        rateLimitEntry.count++
+      }
+
+      // Execute the handler
+      const response = await handler(req)
+
+      // Track usage if required and request was successful
+      if (usageMetric && response.status >= 200 && response.status < 300) {
+        try {
+          const supabase = createClient()
+
+          await supabase.rpc('track_usage', {
+            org_id: organizationId,
+            metric: usageMetric,
+            increment_by: 1
+          })
+        } catch (error) {
+          console.error('Usage tracking error:', error)
+        }
+      }
+
+      return response
+    })
   }
 }

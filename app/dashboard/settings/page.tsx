@@ -23,6 +23,7 @@ import {
 import { toast } from 'react-hot-toast'
 import { useTenant } from '@/contexts/TenantContext'
 import { createClient } from '@/lib/supabase'
+import { fetchWithOrg, getOrgHeaders } from '@/lib/api-utils'
 
 export default function SettingsPage() {
   const [qrCode, setQrCode] = useState<string | null>(null)
@@ -83,7 +84,7 @@ export default function SettingsPage() {
 
   const checkSessionStatus = async () => {
     try {
-      const response = await fetch('/api/whatsapp/session-status')
+      const response = await fetchWithOrg('/api/whatsapp/session-status')
       const data = await response.json()
       setSessionStatus(data.status || 'disconnected')
     } catch (error) {
@@ -94,7 +95,7 @@ export default function SettingsPage() {
   const getQRCode = async () => {
     setLoading(true)
     try {
-      const response = await fetch('/api/whatsapp/qr-code')
+      const response = await fetchWithOrg('/api/whatsapp/qr-code')
       const data = await response.json()
 
       if (data.qr) {
@@ -118,7 +119,7 @@ export default function SettingsPage() {
   const createSession = async () => {
     setLoading(true)
     try {
-      const response = await fetch('/api/whatsapp/create-session', {
+      const response = await fetchWithOrg('/api/whatsapp/create-session', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sessionName: 'default' })

@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
       : undefined
 
     // Create WAHA client for this organization
-    const wahaClient = await WAHAClient.forOrganization(membership.organization_id)
+    const wahaClient = await WAHAClient.forOrganization(membership.organization_id, request)
 
     // Create session via WAHA
     const sessionData = await wahaClient.createSession(finalSessionName, finalWebhookUrl)
