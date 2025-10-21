@@ -150,17 +150,25 @@ function ChatPageContent() {
 
   return (
     <DashboardLayout>
-      <div className="flex h-[calc(100vh-120px)] -mx-3 sm:-mx-4 md:-mx-6 lg:-mx-10 -my-4 sm:-my-6 md:-my-8">
-        <ChatSidebar
-          contacts={contacts}
-          selectedContact={selectedContact}
-          onSelectContact={setSelectedContact}
-          loading={loading}
-        />
-        <ChatWindow
-          selectedContact={selectedContact}
-          onContactUpdate={fetchContacts}
-        />
+      <div className="flex h-[calc(100vh-120px)] -mx-3 sm:-mx-4 md:-mx-6 lg:-mx-10 -my-4 sm:-my-6 md:-my-8 overflow-hidden">
+        {/* Chat Sidebar - Hidden on mobile when a chat is selected */}
+        <div className={`${selectedContact ? 'hidden lg:block' : 'block'} w-full lg:w-auto h-full`}>
+          <ChatSidebar
+            contacts={contacts}
+            selectedContact={selectedContact}
+            onSelectContact={setSelectedContact}
+            loading={loading}
+          />
+        </div>
+
+        {/* Chat Window - Only visible on mobile when a chat is selected */}
+        <div className={`${selectedContact ? 'block' : 'hidden lg:block'} w-full lg:flex-1 h-full`}>
+          <ChatWindow
+            selectedContact={selectedContact}
+            onContactUpdate={fetchContacts}
+            onBack={() => setSelectedContact(null)}
+          />
+        </div>
       </div>
     </DashboardLayout>
   )

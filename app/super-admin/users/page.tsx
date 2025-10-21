@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { createClient } from '@/lib/supabase'
 import {
   Users,
   Search,
@@ -35,7 +35,7 @@ interface User {
 
 export default function UsersPage() {
   const router = useRouter()
-  const supabase = createClientComponentClient()
+  const supabase = createClient()
   const [loading, setLoading] = useState(true)
   const [users, setUsers] = useState<User[]>([])
   const [filteredUsers, setFilteredUsers] = useState<User[]>([])
@@ -79,58 +79,16 @@ export default function UsersPage() {
 
   async function loadUsers() {
     try {
-      // Get all users from auth.users
-      const { data: authUsers, error: authError } = await supabase.auth.admin.listUsers()
+      // Get all users via API route (which uses service role key)
+      const response = await fetch('/api/super-admin/users')
 
-      if (authError) throw authError
+      if (!response.ok) {
+        throw new Error('Failed to load users')
+      }
 
-      // Get organization memberships
-      const { data: memberships, error: memberError } = await supabase
-        .from('organization_members')
-        .select(`
-          user_id,
-          role,
-          is_active,
-          organization_id,
-          organizations (
-            id,
-            name
-          )
-        `)
+      const { users: loadedUsers } = await response.json()
 
-      if (memberError) throw memberError
-
-      // Get super admins
-      const { data: superAdmins, error: superError } = await supabase
-        .from('super_admins')
-        .select('user_id')
-        .eq('is_active', true)
-
-      if (superError) throw superError
-
-      const superAdminIds = new Set(superAdmins?.map(sa => sa.user_id) || [])
-
-      // Combine data
-      const combinedUsers = authUsers.users.map(user => {
-        const userMemberships = memberships?.filter(m => m.user_id === user.id) || []
-        return {
-          id: user.id,
-          email: user.email || '',
-          created_at: user.created_at,
-          last_sign_in_at: user.last_sign_in_at,
-          email_confirmed_at: user.email_confirmed_at,
-          raw_user_meta_data: user.user_metadata,
-          organizations: userMemberships.map(m => ({
-            org_id: m.organization_id,
-            org_name: (m.organizations as any)?.name || 'Unknown',
-            role: m.role,
-            is_active: m.is_active
-          })),
-          is_super_admin: superAdminIds.has(user.id)
-        }
-      })
-
-      setUsers(combinedUsers)
+      setUsers(loadedUsers)
     } catch (error) {
       console.error('Error loading users:', error)
       toast.error('Fehler beim Laden der Benutzer')
@@ -184,27 +142,27 @@ export default function UsersPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500"></div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-900">
       {/* Header */}
-      <div className="bg-white shadow">
+      <div className="bg-gray-800 shadow-xl border-b border-gray-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <Users className="h-8 w-8 text-purple-600" />
               <div>
-                <h1 className="text-3xl font-bold text-gray-900">Benutzer</h1>
-                <p className="text-sm text-gray-600 mt-1">{users.length} Benutzer gesamt</p>
+                <h1 className="text-3xl font-bold text-white">Benutzer</h1>
+                <p className="text-sm text-gray-400 mt-1">{users.length} Benutzer gesamt</p>
               </div>
             </div>
             <button
               onClick={() => router.push('/super-admin')}
-              className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
+              className="px-4 py-2 bg-gray-200 text-gray-300 rounded-lg hover:bg-gray-300 transition-colors"
             >
               Zurück
             </button>
@@ -214,7 +172,7 @@ export default function UsersPage() {
 
       {/* Search */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div className="bg-white rounded-lg shadow p-4 mb-6">
+        <div className="bg-gray-800 border border-gray-700 rounded-lg shadow-lg p-4 mb-6">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
             <input
@@ -222,61 +180,61 @@ export default function UsersPage() {
               placeholder="Nach E-Mail, Name oder Organisation suchen..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+              className="w-full pl-10 pr-4 py-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
             />
           </div>
         </div>
 
         {/* Users Table */}
-        <div className="bg-white rounded-lg shadow overflow-hidden">
+        <div className="bg-gray-800 border border-gray-700 rounded-lg shadow-lg overflow-hidden">
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+              <thead className="bg-gray-900">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                     Benutzer
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                     Organisationen
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                     Status
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                     Erstellt
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                     Letzter Login
                   </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">
                     Aktionen
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="bg-gray-800 divide-y divide-gray-200">
                 {filteredUsers.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
+                    <td colSpan={6} className="px-6 py-12 text-center text-gray-400">
                       <Users className="h-12 w-12 mx-auto text-gray-300 mb-3" />
                       <p>Keine Benutzer gefunden</p>
                     </td>
                   </tr>
                 ) : (
                   filteredUsers.map((user) => (
-                    <tr key={user.id} className="hover:bg-gray-50">
+                    <tr key={user.id} className="hover:bg-gray-900">
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
                           <div className="flex-shrink-0 h-10 w-10 rounded-full bg-purple-100 flex items-center justify-center">
                             <Users className="h-5 w-5 text-purple-600" />
                           </div>
                           <div>
-                            <div className="text-sm font-medium text-gray-900 flex items-center gap-2">
+                            <div className="text-sm font-medium text-white flex items-center gap-2">
                               {user.raw_user_meta_data?.full_name || 'Kein Name'}
                               {user.is_super_admin && (
                                 <Shield className="h-4 w-4 text-red-500" title="Super Admin" />
                               )}
                             </div>
-                            <div className="text-sm text-gray-500 flex items-center gap-1">
+                            <div className="text-sm text-gray-400 flex items-center gap-1">
                               <Mail className="h-3 w-3" />
                               {user.email}
                             </div>
@@ -292,8 +250,8 @@ export default function UsersPage() {
                               <div key={idx} className="text-sm">
                                 <span className="flex items-center gap-1">
                                   <Building2 className="h-3 w-3 text-gray-400" />
-                                  <span className="text-gray-900">{org.org_name}</span>
-                                  <span className="text-xs text-gray-500">({org.role})</span>
+                                  <span className="text-white">{org.org_name}</span>
+                                  <span className="text-xs text-gray-400">({org.role})</span>
                                 </span>
                               </div>
                             ))
@@ -302,24 +260,24 @@ export default function UsersPage() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         {user.email_confirmed_at ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-500/20 text-green-400">
                             <CheckCircle className="h-3 w-3" />
                             Bestätigt
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-yellow-500/20 text-yellow-400">
                             <XCircle className="h-3 w-3" />
                             Unbestätigt
                           </span>
                         )}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
                         <div className="flex items-center gap-1">
                           <Calendar className="h-4 w-4 text-gray-400" />
                           {new Date(user.created_at).toLocaleDateString('de-DE')}
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
                         {user.last_sign_in_at
                           ? new Date(user.last_sign_in_at).toLocaleDateString('de-DE')
                           : 'Nie'}

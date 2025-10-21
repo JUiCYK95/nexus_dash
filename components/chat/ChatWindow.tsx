@@ -1,9 +1,9 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { 
-  PaperAirplaneIcon, 
-  UserIcon, 
+import {
+  PaperAirplaneIcon,
+  UserIcon,
   PhoneIcon,
   VideoCameraIcon,
   EllipsisVerticalIcon,
@@ -11,7 +11,8 @@ import {
   FaceSmileIcon,
   XMarkIcon,
   DocumentIcon,
-  PhotoIcon
+  PhotoIcon,
+  ChevronLeftIcon
 } from '@heroicons/react/24/outline'
 import { createClient } from '@/lib/supabase'
 import { toast } from 'react-hot-toast'
@@ -19,9 +20,10 @@ import { toast } from 'react-hot-toast'
 interface ChatWindowProps {
   selectedContact: any
   onContactUpdate: () => void
+  onBack?: () => void
 }
 
-export default function ChatWindow({ selectedContact, onContactUpdate }: ChatWindowProps) {
+export default function ChatWindow({ selectedContact, onContactUpdate, onBack }: ChatWindowProps) {
   const [message, setMessage] = useState('')
   const [messages, setMessages] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
@@ -35,7 +37,8 @@ export default function ChatWindow({ selectedContact, onContactUpdate }: ChatWin
     if (selectedContact) {
       fetchMessages()
     }
-  }, [selectedContact])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedContact?.id])
 
   useEffect(() => {
     scrollToBottom()
@@ -245,61 +248,74 @@ export default function ChatWindow({ selectedContact, onContactUpdate }: ChatWin
   }
 
   return (
-    <div className="flex-1 flex flex-col bg-gray-900">
+    <div className="flex-1 flex flex-col bg-gray-900 h-full overflow-hidden">
       {/* Chat Header */}
-      <div className="p-4 border-b border-gray-700/50 bg-gray-800/50 backdrop-blur-sm">
+      <div className="flex-shrink-0 p-3 sm:p-4 border-b border-gray-700/50 bg-gray-800/50 backdrop-blur-sm">
         <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className="relative">
-              <div className="w-10 h-10 bg-gray-600 rounded-full flex items-center justify-center">
+          <div className="flex items-center space-x-2 sm:space-x-3">
+            {/* Back Button for Mobile */}
+            {onBack && (
+              <button
+                onClick={onBack}
+                className="lg:hidden p-2 hover:bg-gray-700/50 rounded-full transition-colors flex-shrink-0"
+                aria-label="Zurück zur Chat-Liste"
+              >
+                <ChevronLeftIcon className="h-5 w-5 sm:h-6 sm:w-6 text-gray-300" />
+              </button>
+            )}
+            <div className="relative flex-shrink-0">
+              <div className="w-9 h-9 sm:w-10 sm:h-10 bg-gray-600 rounded-full flex items-center justify-center">
                 {selectedContact.profile_picture_url ? (
-                  <img 
-                    src={selectedContact.profile_picture_url} 
+                  <img
+                    src={selectedContact.profile_picture_url}
                     alt={selectedContact.name}
                     className="w-full h-full rounded-full object-cover"
                   />
                 ) : (
-                  <UserIcon className="h-5 w-5 text-gray-300" />
+                  <UserIcon className="h-4 w-4 sm:h-5 sm:w-5 text-gray-300" />
                 )}
               </div>
               {selectedContact.online && (
-                <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-gray-800"></div>
+                <div className="absolute -bottom-0.5 -right-0.5 sm:-bottom-1 sm:-right-1 w-2.5 h-2.5 sm:w-3 sm:h-3 bg-green-500 rounded-full border-2 border-gray-800"></div>
               )}
             </div>
-            <div>
-              <h3 className="text-lg font-medium text-white">
+            <div className="min-w-0 flex-1">
+              <h3 className="text-base sm:text-lg font-medium text-white truncate">
                 {selectedContact.name || selectedContact.phone_number}
               </h3>
-              <p className="text-sm text-gray-400">
+              <p className="text-xs sm:text-sm text-gray-400 truncate">
                 {selectedContact.online ? 'Online' : 'Zuletzt gesehen vor 5 Minuten'}
               </p>
               {selectedContact.vehicle && (
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-gray-500 truncate hidden sm:block">
                   {selectedContact.vehicle}
                 </p>
               )}
             </div>
           </div>
           
-          <div className="flex items-center space-x-2">
-            <button 
+          <div className="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
+            <button
               onClick={handlePhoneCall}
-              className="p-2 hover:bg-gray-700/50 rounded-full transition-colors"
+              className="p-1.5 sm:p-2 hover:bg-gray-700/50 rounded-full transition-colors"
+              aria-label="Anrufen"
             >
-              <PhoneIcon className="h-5 w-5 text-gray-400" />
+              <PhoneIcon className="h-4 w-4 sm:h-5 sm:w-5 text-gray-400" />
             </button>
-            <button 
+            <button
               onClick={handleVideoCall}
-              className="p-2 hover:bg-gray-700/50 rounded-full transition-colors"
+              className="hidden sm:block p-2 hover:bg-gray-700/50 rounded-full transition-colors"
+              aria-label="Videoanruf"
             >
               <VideoCameraIcon className="h-5 w-5 text-gray-400" />
             </button>
             <div className="relative">
-              <button 
+              <button
                 onClick={() => setShowContactMenu(!showContactMenu)}
-                className="p-2 hover:bg-gray-700/50 rounded-full transition-colors"
+                className="p-1.5 sm:p-2 hover:bg-gray-700/50 rounded-full transition-colors"
+                aria-label="Menü"
               >
-                <EllipsisVerticalIcon className="h-5 w-5 text-gray-400" />
+                <EllipsisVerticalIcon className="h-4 w-4 sm:h-5 sm:w-5 text-gray-400" />
               </button>
               
               {/* Contact Menu Dropdown */}
@@ -448,7 +464,7 @@ export default function ChatWindow({ selectedContact, onContactUpdate }: ChatWin
       </div>
 
       {/* Message Input */}
-      <div className="p-4 border-t border-gray-700/50 bg-gray-800/50 backdrop-blur-sm">
+      <div className="flex-shrink-0 p-3 sm:p-4 border-t border-gray-700/50 bg-gray-800/50 backdrop-blur-sm">
         <div className="flex items-center space-x-2">
           <div className="relative">
             <button 

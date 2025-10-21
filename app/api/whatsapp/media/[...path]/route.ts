@@ -4,9 +4,11 @@ import { WAHAClient } from '@/lib/waha-client'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { path: string[] } }
+  { params }: { params: Promise<{ path: string[] }> }
 ) {
   try {
+    const { path } = await params
+
     // Get user's organization
     const supabase = createServerSupabaseClient(request)
     const { data: { user } } = await supabase.auth.getUser()
@@ -48,7 +50,7 @@ export async function GET(
     }
 
     // Construct the full media URL
-    const mediaPath = params.path.join('/')
+    const mediaPath = path.join('/')
     const mediaUrl = `${org.waha_api_url}/api/files/${mediaPath}`
 
     console.log('📥 Fetching media from WAHA:', mediaUrl)

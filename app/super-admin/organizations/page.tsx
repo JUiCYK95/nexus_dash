@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { createClient } from '@/lib/supabase'
 import {
   Building2,
   Plus,
@@ -37,7 +37,7 @@ interface Organization {
 
 export default function OrganizationsPage() {
   const router = useRouter()
-  const supabase = createClientComponentClient()
+  const supabase = createClient()
   const [loading, setLoading] = useState(true)
   const [organizations, setOrganizations] = useState<Organization[]>([])
   const [filteredOrgs, setFilteredOrgs] = useState<Organization[]>([])
@@ -45,6 +45,15 @@ export default function OrganizationsPage() {
   const [filterStatus, setFilterStatus] = useState<string>('all')
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [editingOrg, setEditingOrg] = useState<Organization | null>(null)
+  const [creating, setCreating] = useState(false)
+  const [formData, setFormData] = useState({
+    name: '',
+    subscription_plan: 'starter',
+    subscription_status: 'trialing',
+    owner_email: '',
+    waha_api_url: '',
+    waha_api_key: ''
+  })
 
   useEffect(() => {
     checkSuperAdmin()
@@ -138,12 +147,70 @@ export default function OrganizationsPage() {
     }
   }
 
+  async function createOrganization() {
+    if (!formData.name) {
+      toast.error('Name ist erforderlich')
+      return
+    }
+
+    if (!formData.owner_email) {
+      toast.error('Owner E-Mail ist erforderlich')
+      return
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(formData.owner_email)) {
+      toast.error('Bitte geben Sie eine gültige E-Mail-Adresse ein')
+      return
+    }
+
+    setCreating(true)
+    try {
+      const response = await fetch('/api/super-admin/organizations', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Fehler beim Erstellen der Organisation')
+      }
+
+      if (data.invitation_sent) {
+        toast.success('Organisation erstellt und Einladung versendet')
+      } else {
+        toast.success('Organisation erfolgreich erstellt')
+      }
+
+      setShowCreateModal(false)
+      setFormData({
+        name: '',
+        subscription_plan: 'starter',
+        subscription_status: 'trialing',
+        owner_email: '',
+        waha_api_url: '',
+        waha_api_key: ''
+      })
+      await loadOrganizations()
+    } catch (error: any) {
+      console.error('Error creating organization:', error)
+      toast.error(error.message)
+    } finally {
+      setCreating(false)
+    }
+  }
+
   function getStatusBadge(status: string) {
     const badges: Record<string, { color: string; icon: any; text: string }> = {
-      active: { color: 'bg-green-100 text-green-800', icon: CheckCircle, text: 'Aktiv' },
-      trialing: { color: 'bg-blue-100 text-blue-800', icon: Clock, text: 'Testphase' },
-      canceled: { color: 'bg-red-100 text-red-800', icon: XCircle, text: 'Gekündigt' },
-      past_due: { color: 'bg-yellow-100 text-yellow-800', icon: Clock, text: 'Überfällig' },
+      active: { color: 'bg-green-500/20 text-green-400', icon: CheckCircle, text: 'Aktiv' },
+      trialing: { color: 'bg-blue-500/20 text-blue-400', icon: Clock, text: 'Testphase' },
+      canceled: { color: 'bg-red-500/20 text-red-400', icon: XCircle, text: 'Gekündigt' },
+      past_due: { color: 'bg-yellow-500/20 text-yellow-400', icon: Clock, text: 'Überfällig' },
     }
 
     const badge = badges[status] || badges.active
@@ -159,9 +226,9 @@ export default function OrganizationsPage() {
 
   function getPlanBadge(plan: string) {
     const colors: Record<string, string> = {
-      starter: 'bg-gray-100 text-gray-800',
-      professional: 'bg-purple-100 text-purple-800',
-      business: 'bg-blue-100 text-blue-800',
+      starter: 'bg-gray-700 text-gray-200',
+      professional: 'bg-purple-500/20 text-purple-400',
+      business: 'bg-blue-500/20 text-blue-400',
       enterprise: 'bg-orange-100 text-orange-800',
     }
 
@@ -175,28 +242,28 @@ export default function OrganizationsPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500"></div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-900">
       {/* Header */}
-      <div className="bg-white shadow">
+      <div className="bg-gray-800 shadow-xl border-b border-gray-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <Building2 className="h-8 w-8 text-blue-600" />
               <div>
-                <h1 className="text-3xl font-bold text-gray-900">Organisationen</h1>
-                <p className="text-sm text-gray-600 mt-1">{organizations.length} Organisationen gesamt</p>
+                <h1 className="text-3xl font-bold text-white">Organisationen</h1>
+                <p className="text-sm text-gray-400 mt-1">{organizations.length} Organisationen gesamt</p>
               </div>
             </div>
             <div className="flex gap-3">
               <button
                 onClick={() => router.push('/super-admin')}
-                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
+                className="px-4 py-2 bg-gray-200 text-gray-300 rounded-lg hover:bg-gray-300 transition-colors"
               >
                 Zurück
               </button>
@@ -214,7 +281,7 @@ export default function OrganizationsPage() {
 
       {/* Filters */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div className="bg-white rounded-lg shadow p-4 mb-6">
+        <div className="bg-gray-800 border border-gray-700 rounded-lg shadow-lg p-4 mb-6">
           <div className="flex flex-col sm:flex-row gap-4">
             {/* Search */}
             <div className="flex-1">
@@ -225,7 +292,7 @@ export default function OrganizationsPage() {
                   placeholder="Nach Name, Slug oder E-Mail suchen..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full pl-10 pr-4 py-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
             </div>
@@ -235,7 +302,7 @@ export default function OrganizationsPage() {
               <select
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-4 py-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               >
                 <option value="all">Alle Status</option>
                 <option value="active">Aktiv</option>
@@ -248,46 +315,46 @@ export default function OrganizationsPage() {
         </div>
 
         {/* Organizations Table */}
-        <div className="bg-white rounded-lg shadow overflow-hidden">
+        <div className="bg-gray-800 border border-gray-700 rounded-lg shadow-lg overflow-hidden">
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+              <thead className="bg-gray-900">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                     Organisation
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                     Plan
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                     Status
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                     Mitglieder
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                     Erstellt
                   </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">
                     Aktionen
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="bg-gray-800 divide-y divide-gray-200">
                 {filteredOrgs.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
+                    <td colSpan={6} className="px-6 py-12 text-center text-gray-400">
                       <Building2 className="h-12 w-12 mx-auto text-gray-300 mb-3" />
                       <p>Keine Organisationen gefunden</p>
                     </td>
                   </tr>
                 ) : (
                   filteredOrgs.map((org) => (
-                    <tr key={org.id} className="hover:bg-gray-50">
+                    <tr key={org.id} className="hover:bg-gray-900">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div>
-                          <div className="text-sm font-medium text-gray-900">{org.name}</div>
-                          <div className="text-sm text-gray-500">/{org.slug}</div>
+                          <div className="text-sm font-medium text-white">{org.name}</div>
+                          <div className="text-sm text-gray-400">/{org.slug}</div>
                           {org.owner_email && (
                             <div className="text-xs text-gray-400 flex items-center gap-1 mt-1">
                               <Mail className="h-3 w-3" />
@@ -302,22 +369,22 @@ export default function OrganizationsPage() {
                       <td className="px-6 py-4 whitespace-nowrap">
                         {getStatusBadge(org.subscription_status)}
                         {org.trial_ends_at && org.subscription_status === 'trialing' && (
-                          <div className="text-xs text-gray-500 mt-1">
+                          <div className="text-xs text-gray-400 mt-1">
                             Endet: {new Date(org.trial_ends_at).toLocaleDateString('de-DE')}
                           </div>
                         )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center gap-1 text-sm text-gray-900">
+                        <div className="flex items-center gap-1 text-sm text-white">
                           <Users className="h-4 w-4 text-gray-400" />
                           {org.member_count}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">
+                        <div className="text-sm text-white">
                           {new Date(org.created_at).toLocaleDateString('de-DE')}
                         </div>
-                        <div className="text-xs text-gray-500">
+                        <div className="text-xs text-gray-400">
                           {new Date(org.created_at).toLocaleTimeString('de-DE')}
                         </div>
                       </td>
@@ -346,20 +413,147 @@ export default function OrganizationsPage() {
         </div>
       </div>
 
-      {/* Create/Edit Modal would go here */}
-      {(showCreateModal || editingOrg) && (
+      {/* Create Modal */}
+      {showCreateModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg max-w-2xl w-full p-6">
-            <h2 className="text-2xl font-bold mb-4">
-              {editingOrg ? 'Organisation bearbeiten' : 'Neue Organisation erstellen'}
+          <div className="bg-gray-800 border border-gray-700 rounded-lg max-w-2xl w-full p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold text-white">Neue Organisation erstellen</h2>
+              <button
+                onClick={() => setShowCreateModal(false)}
+                className="text-gray-400 hover:text-white"
+              >
+                <XCircle className="h-6 w-6" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {/* Name */}
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Organisationsname *
+                </label>
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="z.B. Meine Organisation"
+                />
+              </div>
+
+              {/* Owner Email */}
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Owner E-Mail *
+                </label>
+                <input
+                  type="email"
+                  value={formData.owner_email}
+                  onChange={(e) => setFormData(prev => ({ ...prev, owner_email: e.target.value }))}
+                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="z.B. owner@example.com"
+                  required
+                />
+                <p className="text-xs text-gray-400 mt-1">
+                  Wenn der Benutzer nicht existiert, wird automatisch eine Einladung versendet
+                </p>
+              </div>
+
+              {/* WAHA API URL */}
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  WAHA API URL
+                </label>
+                <input
+                  type="url"
+                  value={formData.waha_api_url}
+                  onChange={(e) => setFormData(prev => ({ ...prev, waha_api_url: e.target.value }))}
+                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="https://waha.devlike.pro"
+                />
+              </div>
+
+              {/* WAHA API Key */}
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  WAHA API Key
+                </label>
+                <input
+                  type="text"
+                  value={formData.waha_api_key}
+                  onChange={(e) => setFormData(prev => ({ ...prev, waha_api_key: e.target.value }))}
+                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="API Key für WAHA"
+                />
+              </div>
+
+              {/* Subscription Plan */}
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Subscription Plan
+                </label>
+                <select
+                  value={formData.subscription_plan}
+                  onChange={(e) => setFormData(prev => ({ ...prev, subscription_plan: e.target.value }))}
+                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="starter">Starter</option>
+                  <option value="professional">Professional</option>
+                  <option value="business">Business</option>
+                  <option value="enterprise">Enterprise</option>
+                </select>
+              </div>
+
+              {/* Subscription Status */}
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Subscription Status
+                </label>
+                <select
+                  value={formData.subscription_status}
+                  onChange={(e) => setFormData(prev => ({ ...prev, subscription_status: e.target.value }))}
+                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="trialing">Testphase (14 Tage)</option>
+                  <option value="active">Aktiv</option>
+                  <option value="canceled">Gekündigt</option>
+                  <option value="past_due">Überfällig</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6 pt-6 border-t border-gray-700">
+              <button
+                onClick={() => setShowCreateModal(false)}
+                className="flex-1 px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors"
+                disabled={creating}
+              >
+                Abbrechen
+              </button>
+              <button
+                onClick={createOrganization}
+                disabled={creating || !formData.name || !formData.owner_email}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {creating ? 'Erstellen...' : 'Organisation erstellen'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Modal - not yet implemented */}
+      {editingOrg && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-gray-800 border border-gray-700 rounded-lg max-w-2xl w-full p-6">
+            <h2 className="text-2xl font-bold text-white mb-4">
+              Organisation bearbeiten
             </h2>
-            <p className="text-gray-600 mb-4">Feature wird im nächsten Schritt implementiert</p>
+            <p className="text-gray-400 mb-4">Diese Funktion wird noch implementiert</p>
             <button
-              onClick={() => {
-                setShowCreateModal(false)
-                setEditingOrg(null)
-              }}
-              className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+              onClick={() => setEditingOrg(null)}
+              className="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600"
             >
               Schließen
             </button>

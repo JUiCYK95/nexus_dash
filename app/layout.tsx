@@ -7,8 +7,13 @@ import { ThemeProvider } from '@/components/ThemeProvider'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata = {
-  title: 'WhatsApp SaaS Dashboard',
-  description: 'Modern WhatsApp business dashboard with multi-tenancy, billing, and analytics',
+  title: 'Nexus Dashboard',
+  description: 'Modern business dashboard with multi-tenancy, team management, and analytics',
+  icons: {
+    icon: '/logo.png',
+    shortcut: '/logo.png',
+    apple: '/logo.png',
+  },
 }
 
 export default function RootLayout({
