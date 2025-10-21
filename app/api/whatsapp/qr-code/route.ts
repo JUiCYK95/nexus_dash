@@ -19,17 +19,32 @@ export async function GET(request: NextRequest) {
     }
 
     // Get user's organization ID
-    const { data: membership } = await supabase
+    const { data: membership, error: memberError } = await supabase
       .from('organization_members')
-      .select('organization_id')
+      .select('organization_id, role, organization:organizations(name, slug)')
       .eq('user_id', user.id)
       .eq('is_active', true)
       .single()
 
-    if (!membership) {
+    if (!membership || memberError) {
+      // Check if user has pending invitations
+      const { data: invitations } = await supabase
+        .from('organization_invitations')
+        .select('organization:organizations(name)')
+        .eq('email', user.email)
+        .limit(1)
+
       return NextResponse.json({
         success: false,
-        error: 'No organization found'
+        error: 'No organization membership found',
+        details: {
+          message: 'Du bist aktuell kein Mitglied einer Organisation.',
+          suggestions: invitations && invitations.length > 0
+            ? 'Du hast ausstehende Einladungen. Bitte akzeptiere die Einladung zuerst.'
+            : 'Bitte kontaktiere einen Administrator, um zu einer Organisation hinzugefügt zu werden.',
+          user_email: user.email,
+          debug_endpoint: '/api/debug/org-check'
+        }
       }, { status: 404 })
     }
 
