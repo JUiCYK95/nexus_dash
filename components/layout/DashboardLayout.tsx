@@ -21,6 +21,7 @@ import { toast } from 'react-hot-toast'
 import Link from 'next/link'
 import PageTransition from '@/components/ui/PageTransition'
 import Logo from '@/components/Logo'
+import OrganizationSwitcher from '@/components/OrganizationSwitcher'
 
 interface DashboardLayoutProps {
   children: React.ReactNode
@@ -353,6 +354,12 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 </svg>
               </button>
             </div>
+
+            {/* Organization Switcher */}
+            <div className="px-3 sm:px-4 py-3">
+              <OrganizationSwitcher />
+            </div>
+
             <nav className="flex-1 px-3 sm:px-4 space-y-2 sm:space-y-3">
               {navigation.map((item) => (
                 <Link
