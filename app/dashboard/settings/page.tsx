@@ -225,7 +225,7 @@ export default function SettingsPage() {
 
     setLoadingMembers(true)
     try {
-      const response = await fetch('/api/team/members')
+      const response = await fetchWithOrg('/api/team/members')
       const result = await response.json()
 
       if (!response.ok || !result.success) {
@@ -260,7 +260,7 @@ export default function SettingsPage() {
       }
 
       // Call the invite API
-      const response = await fetch('/api/team/invite', {
+      const response = await fetchWithOrg('/api/team/invite', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

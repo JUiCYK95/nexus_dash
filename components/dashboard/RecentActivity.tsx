@@ -8,6 +8,7 @@ import {
   ExclamationCircleIcon
 } from '@heroicons/react/24/outline'
 import { useRouter } from 'next/navigation'
+import { fetchWithOrg } from '@/lib/api-utils'
 
 export default function RecentActivity() {
   const [activities, setActivities] = useState<any[]>([])
@@ -21,7 +22,7 @@ export default function RecentActivity() {
   const fetchRecentActivity = async () => {
     try {
       // Fetch chats overview from WAHA - includes chat info and last message in one call
-      const response = await fetch('/api/whatsapp/chats/overview')
+      const response = await fetchWithOrg('/api/whatsapp/chats/overview')
       const data = await response.json()
 
       if (data.success && data.chats) {

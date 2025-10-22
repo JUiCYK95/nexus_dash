@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+import { fetchWithOrg } from '@/lib/api-utils'
 
 interface EnhancedMessageChartProps {
   period?: number
@@ -19,7 +20,7 @@ export default function EnhancedMessageChart({ period = 7 }: EnhancedMessageChar
   const fetchMessageData = async (days: number) => {
     setLoading(true)
     try {
-      const response = await fetch('/api/whatsapp/chats/overview')
+      const response = await fetchWithOrg('/api/whatsapp/chats/overview')
       const chatsData = await response.json()
 
       if (chatsData.success && chatsData.chats) {

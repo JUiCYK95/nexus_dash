@@ -263,7 +263,7 @@ export default function OrganizationsPage() {
             <div className="flex gap-3">
               <button
                 onClick={() => router.push('/super-admin')}
-                className="px-4 py-2 bg-gray-200 text-gray-300 rounded-lg hover:bg-gray-300 transition-colors"
+                className="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors"
               >
                 Zurück
               </button>
@@ -292,7 +292,7 @@ export default function OrganizationsPage() {
                   placeholder="Nach Name, Slug oder E-Mail suchen..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full pl-10 pr-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
             </div>
@@ -302,7 +302,7 @@ export default function OrganizationsPage() {
               <select
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               >
                 <option value="all">Alle Status</option>
                 <option value="active">Aktiv</option>
@@ -391,14 +391,14 @@ export default function OrganizationsPage() {
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <button
                           onClick={() => setEditingOrg(org)}
-                          className="text-blue-600 hover:text-blue-900 mr-3"
+                          className="text-blue-400 hover:text-blue-300 mr-3"
                           title="Bearbeiten"
                         >
                           <Edit className="h-5 w-5" />
                         </button>
                         <button
                           onClick={() => deleteOrganization(org.id, org.name)}
-                          className="text-red-600 hover:text-red-900"
+                          className="text-red-400 hover:text-red-300"
                           title="Löschen"
                         >
                           <Trash2 className="h-5 w-5" />

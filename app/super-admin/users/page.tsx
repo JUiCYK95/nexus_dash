@@ -162,7 +162,7 @@ export default function UsersPage() {
             </div>
             <button
               onClick={() => router.push('/super-admin')}
-              className="px-4 py-2 bg-gray-200 text-gray-300 rounded-lg hover:bg-gray-300 transition-colors"
+              className="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors"
             >
               Zurück
             </button>
@@ -180,7 +180,7 @@ export default function UsersPage() {
               placeholder="Nach E-Mail, Name oder Organisation suchen..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+              className="w-full pl-10 pr-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
             />
           </div>
         </div>
@@ -287,8 +287,8 @@ export default function UsersPage() {
                           onClick={() => toggleSuperAdmin(user.id, user.is_super_admin)}
                           className={`px-3 py-1 rounded text-xs font-medium ${
                             user.is_super_admin
-                              ? 'bg-red-100 text-red-700 hover:bg-red-200'
-                              : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                              ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30 border border-red-500/30'
+                              : 'bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 border border-blue-500/30'
                           }`}
                           title={user.is_super_admin ? 'Super Admin entfernen' : 'Zu Super Admin machen'}
                         >

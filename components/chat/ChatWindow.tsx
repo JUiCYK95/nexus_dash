@@ -148,6 +148,9 @@ export default function ChatWindow({ selectedContact, onContactUpdate, onBack }:
       setMessages(prev => [...prev, newMessage])
       setMessage('')
 
+      // Extract phone number from chat ID (e.g., "38976506990@c.us" -> "38976506990")
+      const phoneNumber = selectedContact.id.replace('@c.us', '').replace('@g.us', '')
+
       // Send message via API
       const response = await fetchWithOrg('/api/whatsapp/send-message', {
         method: 'POST',
@@ -156,6 +159,7 @@ export default function ChatWindow({ selectedContact, onContactUpdate, onBack }:
         },
         body: JSON.stringify({
           contactId: selectedContact.id,
+          phoneNumber: phoneNumber,
           message: messageToSend
         })
       })

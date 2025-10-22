@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts'
+import { fetchWithOrg } from '@/lib/api-utils'
 
 interface MessageChartProps {
   period?: number
@@ -19,7 +20,7 @@ export default function MessageChart({ period = 7 }: MessageChartProps) {
     setLoading(true)
     try {
       // Fetch chats overview from WAHA - more efficient than fetching all chats
-      const response = await fetch('/api/whatsapp/chats/overview')
+      const response = await fetchWithOrg('/api/whatsapp/chats/overview')
       const chatsData = await response.json()
 
       if (chatsData.success && chatsData.chats) {
