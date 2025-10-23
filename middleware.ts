@@ -111,9 +111,14 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // Redirect authenticated users away from auth pages
+  // Redirect authenticated users away from auth pages (except reset-password)
   if (session && ['/login', '/register'].includes(request.nextUrl.pathname)) {
     return NextResponse.redirect(new URL('/dashboard', request.url))
+  }
+
+  // Allow reset-password page without session check (tokens are in URL hash)
+  if (request.nextUrl.pathname === '/reset-password') {
+    return response
   }
 
   return response
