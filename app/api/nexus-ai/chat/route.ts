@@ -4,9 +4,13 @@ import { createServerClient } from '@supabase/ssr'
 import { createClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-})
+// Initialize OpenAI only if API key is available
+let openai: OpenAI | null = null
+if (process.env.OPENAI_API_KEY) {
+  openai = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY,
+  })
+}
 
 // Create admin client for database operations
 const supabaseAdmin = createClient(
@@ -63,6 +67,13 @@ export async function POST(request: NextRequest) {
 
     if (userMessageError) {
       console.error('Error saving user message:', userMessageError)
+    }
+
+    // Check if OpenAI is initialized
+    if (!openai) {
+      return NextResponse.json({
+        error: 'OpenAI API key is not configured'
+      }, { status: 500 })
     }
 
     // System prompt für Nexus AI

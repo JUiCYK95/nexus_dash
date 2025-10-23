@@ -9,7 +9,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import SyntaxHighlighter from 'react-syntax-highlighter/dist/esm/light'
-import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/hljs'
+import { vs2015 } from 'react-syntax-highlighter/dist/esm/styles/hljs'
 import javascript from 'react-syntax-highlighter/dist/esm/languages/hljs/javascript'
 import typescript from 'react-syntax-highlighter/dist/esm/languages/hljs/typescript'
 import python from 'react-syntax-highlighter/dist/esm/languages/hljs/python'
@@ -73,7 +73,7 @@ const CodeBlock = ({ language, value }: { language: string; value: string }) => 
       </div>
       <SyntaxHighlighter
         language={language || 'text'}
-        style={vscDarkPlus}
+        style={vs2015}
         customStyle={{
           margin: 0,
           borderTopLeftRadius: 0,
