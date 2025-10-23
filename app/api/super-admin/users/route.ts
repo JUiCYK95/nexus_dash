@@ -71,6 +71,25 @@ export async function GET(request: NextRequest) {
       console.error('Membership error:', memberError)
     }
 
+    // Get pending invitations
+    const { data: invitations, error: invitationsError } = await supabaseAdmin
+      .from('organization_invitations')
+      .select(`
+        id,
+        email,
+        organization_id,
+        role,
+        invited_by,
+        created_at,
+        expires_at,
+        organization:organizations(id, name)
+      `)
+      .is('accepted_at', null)
+
+    if (invitationsError) {
+      console.error('Invitations error:', invitationsError)
+    }
+
     // Get super admins
     const { data: superAdmins, error: superAdminsError } = await supabaseAdmin
       .from('super_admins')
@@ -96,11 +115,42 @@ export async function GET(request: NextRequest) {
           role: m.role,
           is_active: m.is_active
         })),
-        is_super_admin: superAdminIds.has(authUser.id)
+        is_super_admin: superAdminIds.has(authUser.id),
+        status: 'active'
       }
     })
 
-    return NextResponse.json({ users })
+    // Add pending invitations as "pending users"
+    const pendingUsers = (invitations || []).map(invitation => {
+      const now = new Date()
+      const expiresAt = new Date(invitation.expires_at)
+      const isExpired = expiresAt < now
+
+      return {
+        id: invitation.id,
+        email: invitation.email,
+        created_at: invitation.created_at,
+        last_sign_in_at: null,
+        email_confirmed_at: null,
+        raw_user_meta_data: { full_name: invitation.email.split('@')[0] },
+        organizations: [{
+          org_id: invitation.organization_id,
+          org_name: invitation.organization?.name || 'Unknown',
+          role: invitation.role,
+          is_active: false
+        }],
+        is_super_admin: false,
+        status: isExpired ? 'expired' : 'pending',
+        invitation_id: invitation.id,
+        invited_by: invitation.invited_by,
+        expires_at: invitation.expires_at
+      }
+    })
+
+    // Combine active users and pending invitations
+    const allUsers = [...users, ...pendingUsers]
+
+    return NextResponse.json({ users: allUsers, invitations: pendingUsers })
 
   } catch (error: any) {
     console.error('Error in users API:', error)

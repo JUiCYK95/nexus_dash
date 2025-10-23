@@ -13,7 +13,10 @@ import {
   CheckCircle,
   XCircle,
   Edit,
-  Trash2
+  Trash2,
+  Clock,
+  Send,
+  RefreshCw
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -31,6 +34,10 @@ interface User {
     is_active: boolean
   }>
   is_super_admin: boolean
+  status?: 'active' | 'pending' | 'expired'
+  invitation_id?: string
+  invited_by?: string
+  expires_at?: string
 }
 
 export default function UsersPage() {
@@ -40,6 +47,9 @@ export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([])
   const [filteredUsers, setFilteredUsers] = useState<User[]>([])
   const [searchTerm, setSearchTerm] = useState('')
+  const [organizations, setOrganizations] = useState<Array<{ id: string; name: string }>>([])
+  const [editingUserId, setEditingUserId] = useState<string | null>(null)
+  const [selectedOrgId, setSelectedOrgId] = useState<string>('')
 
   useEffect(() => {
     checkSuperAdmin()
@@ -71,6 +81,7 @@ export default function UsersPage() {
       }
 
       await loadUsers()
+      await loadOrganizations()
     } catch (error) {
       console.error('Error:', error)
       router.push('/dashboard')
@@ -94,6 +105,20 @@ export default function UsersPage() {
       toast.error('Fehler beim Laden der Benutzer')
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function loadOrganizations() {
+    try {
+      const { data, error } = await supabase
+        .from('organizations')
+        .select('id, name')
+        .order('name')
+
+      if (error) throw error
+      setOrganizations(data || [])
+    } catch (error) {
+      console.error('Error loading organizations:', error)
     }
   }
 
@@ -136,6 +161,58 @@ export default function UsersPage() {
     } catch (error: any) {
       console.error('Error toggling super admin:', error)
       toast.error('Fehler: ' + error.message)
+    }
+  }
+
+  async function changeOrganization(userId: string, oldOrgId: string) {
+    if (!selectedOrgId) {
+      toast.error('Bitte wählen Sie eine Organisation')
+      return
+    }
+
+    try {
+      const response = await fetch(`/api/super-admin/users/${userId}/change-organization`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          newOrganizationId: selectedOrgId,
+          oldOrganizationId: oldOrgId
+        })
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Fehler beim Ändern der Organisation')
+      }
+
+      toast.success('Organisation erfolgreich geändert')
+      setEditingUserId(null)
+      setSelectedOrgId('')
+      await loadUsers()
+    } catch (error: any) {
+      console.error('Error changing organization:', error)
+      toast.error(error.message)
+    }
+  }
+
+  async function resendInvitation(invitationId: string) {
+    try {
+      const response = await fetch(`/api/super-admin/invitations/${invitationId}/resend`, {
+        method: 'POST'
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Fehler beim erneuten Versenden')
+      }
+
+      toast.success('Einladung wurde erfolgreich erneut versendet')
+      await loadUsers()
+    } catch (error: any) {
+      console.error('Error resending invitation:', error)
+      toast.error(error.message)
     }
   }
 
@@ -221,17 +298,42 @@ export default function UsersPage() {
                   </tr>
                 ) : (
                   filteredUsers.map((user) => (
-                    <tr key={user.id} className="hover:bg-gray-900">
+                    <tr
+                      key={user.id}
+                      className={`hover:bg-gray-900 ${
+                        user.status === 'pending' ? 'bg-yellow-900/10 border-l-4 border-yellow-500' :
+                        user.status === 'expired' ? 'bg-red-900/10 border-l-4 border-red-500 opacity-70' :
+                        ''
+                      }`}
+                    >
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
-                          <div className="flex-shrink-0 h-10 w-10 rounded-full bg-purple-100 flex items-center justify-center">
-                            <Users className="h-5 w-5 text-purple-600" />
+                          <div className={`flex-shrink-0 h-10 w-10 rounded-full flex items-center justify-center ${
+                            user.status === 'pending' || user.status === 'expired'
+                              ? 'bg-yellow-500/20'
+                              : 'bg-purple-100'
+                          }`}>
+                            {user.status === 'pending' || user.status === 'expired' ? (
+                              <Clock className="h-5 w-5 text-yellow-400" />
+                            ) : (
+                              <Users className="h-5 w-5 text-purple-600" />
+                            )}
                           </div>
                           <div>
                             <div className="text-sm font-medium text-white flex items-center gap-2">
                               {user.raw_user_meta_data?.full_name || 'Kein Name'}
                               {user.is_super_admin && (
                                 <Shield className="h-4 w-4 text-red-500" title="Super Admin" />
+                              )}
+                              {user.status === 'pending' && (
+                                <span className="text-xs px-2 py-0.5 rounded-full bg-yellow-500/20 text-yellow-400 border border-yellow-500/50">
+                                  Ausstehend
+                                </span>
+                              )}
+                              {user.status === 'expired' && (
+                                <span className="text-xs px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 border border-red-500/50">
+                                  Abgelaufen
+                                </span>
                               )}
                             </div>
                             <div className="text-sm text-gray-400 flex items-center gap-1">
@@ -242,24 +344,76 @@ export default function UsersPage() {
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        <div className="space-y-1">
-                          {user.organizations.length === 0 ? (
-                            <span className="text-sm text-gray-400">Keine Organisationen</span>
-                          ) : (
-                            user.organizations.map((org, idx) => (
-                              <div key={idx} className="text-sm">
-                                <span className="flex items-center gap-1">
-                                  <Building2 className="h-3 w-3 text-gray-400" />
-                                  <span className="text-white">{org.org_name}</span>
-                                  <span className="text-xs text-gray-400">({org.role})</span>
-                                </span>
-                              </div>
-                            ))
-                          )}
-                        </div>
+                        {editingUserId === user.id && user.organizations[0] ? (
+                          <div className="flex items-center gap-2">
+                            <select
+                              value={selectedOrgId}
+                              onChange={(e) => setSelectedOrgId(e.target.value)}
+                              className="px-2 py-1 bg-gray-700 border border-gray-600 rounded text-sm text-white"
+                            >
+                              <option value="">Organisation wählen...</option>
+                              {organizations.map(org => (
+                                <option key={org.id} value={org.id}>{org.name}</option>
+                              ))}
+                            </select>
+                            <button
+                              onClick={() => changeOrganization(user.id, user.organizations[0].org_id)}
+                              className="px-2 py-1 bg-green-500/20 text-green-400 rounded text-xs hover:bg-green-500/30"
+                            >
+                              Speichern
+                            </button>
+                            <button
+                              onClick={() => {
+                                setEditingUserId(null)
+                                setSelectedOrgId('')
+                              }}
+                              className="px-2 py-1 bg-gray-500/20 text-gray-400 rounded text-xs hover:bg-gray-500/30"
+                            >
+                              Abbrechen
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="space-y-1">
+                            {user.organizations.length === 0 ? (
+                              <span className="text-sm text-gray-400">Keine Organisationen</span>
+                            ) : (
+                              user.organizations.map((org, idx) => (
+                                <div key={idx} className="text-sm flex items-center gap-2">
+                                  <span className="flex items-center gap-1">
+                                    <Building2 className="h-3 w-3 text-gray-400" />
+                                    <span className="text-white">{org.org_name}</span>
+                                    <span className="text-xs text-gray-400">({org.role})</span>
+                                  </span>
+                                  {user.status === 'active' && (
+                                    <button
+                                      onClick={() => {
+                                        setEditingUserId(user.id)
+                                        setSelectedOrgId(org.org_id)
+                                      }}
+                                      className="text-blue-400 hover:text-blue-300"
+                                      title="Organisation ändern"
+                                    >
+                                      <Edit className="h-3 w-3" />
+                                    </button>
+                                  )}
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        {user.email_confirmed_at ? (
+                        {user.status === 'pending' ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-yellow-500/20 text-yellow-400 border border-yellow-500/30">
+                            <Clock className="h-3 w-3" />
+                            Einladung ausstehend
+                          </span>
+                        ) : user.status === 'expired' ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-red-500/20 text-red-400 border border-red-500/30">
+                            <XCircle className="h-3 w-3" />
+                            Abgelaufen
+                          </span>
+                        ) : user.email_confirmed_at ? (
                           <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-500/20 text-green-400">
                             <CheckCircle className="h-3 w-3" />
                             Bestätigt
@@ -276,6 +430,12 @@ export default function UsersPage() {
                           <Calendar className="h-4 w-4 text-gray-400" />
                           {new Date(user.created_at).toLocaleDateString('de-DE')}
                         </div>
+                        {user.expires_at && (
+                          <div className="flex items-center gap-1 text-xs text-gray-400 mt-1">
+                            <Clock className="h-3 w-3" />
+                            Läuft ab: {new Date(user.expires_at).toLocaleDateString('de-DE')}
+                          </div>
+                        )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
                         {user.last_sign_in_at
@@ -283,17 +443,30 @@ export default function UsersPage() {
                           : 'Nie'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <button
-                          onClick={() => toggleSuperAdmin(user.id, user.is_super_admin)}
-                          className={`px-3 py-1 rounded text-xs font-medium ${
-                            user.is_super_admin
-                              ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30 border border-red-500/30'
-                              : 'bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 border border-blue-500/30'
-                          }`}
-                          title={user.is_super_admin ? 'Super Admin entfernen' : 'Zu Super Admin machen'}
-                        >
-                          {user.is_super_admin ? 'Admin entfernen' : 'Admin machen'}
-                        </button>
+                        <div className="flex items-center justify-end gap-2">
+                          {(user.status === 'pending' || user.status === 'expired') && user.invitation_id ? (
+                            <button
+                              onClick={() => resendInvitation(user.invitation_id!)}
+                              className="px-3 py-1 rounded text-xs font-medium bg-purple-500/20 text-purple-400 hover:bg-purple-500/30 border border-purple-500/30 inline-flex items-center gap-1"
+                              title="Einladung erneut versenden"
+                            >
+                              <RefreshCw className="h-3 w-3" />
+                              Erneut senden
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => toggleSuperAdmin(user.id, user.is_super_admin)}
+                              className={`px-3 py-1 rounded text-xs font-medium ${
+                                user.is_super_admin
+                                  ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30 border border-red-500/30'
+                                  : 'bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 border border-blue-500/30'
+                              }`}
+                              title={user.is_super_admin ? 'Super Admin entfernen' : 'Zu Super Admin machen'}
+                            >
+                              {user.is_super_admin ? 'Admin entfernen' : 'Admin machen'}
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))
