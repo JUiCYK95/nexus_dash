@@ -1,15 +1,10 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { validateCSRF, addCSRFTokenToResponse } from './lib/csrf'
-import {
-  authRateLimiter,
-  apiRateLimiter,
-  messagingRateLimiter,
-  getClientIdentifier,
-  createRateLimitResponse,
-  addRateLimitHeaders
-} from './lib/rate-limit'
+
+// Note: Rate limiting and CSRF are temporarily disabled in middleware
+// due to Edge Runtime compatibility issues. They can be re-enabled
+// at the API route level for better control.
 
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({
@@ -18,52 +13,11 @@ export async function middleware(request: NextRequest) {
     },
   })
 
-  // Apply rate limiting based on route
-  const pathname = request.nextUrl.pathname
-
-  // Auth endpoints - strict rate limiting (5 req/15min)
-  if (pathname.match(/^\/(login|register|api\/auth)/)) {
-    const identifier = getClientIdentifier(request)
-    const result = authRateLimiter.check(identifier)
-
-    if (result.limited) {
-      return createRateLimitResponse(result.resetTime)
-    }
-  }
-
-  // Messaging endpoints - moderate rate limiting (30 req/min)
-  if (pathname.startsWith('/api/whatsapp/send-message')) {
-    const identifier = getClientIdentifier(request)
-    const result = messagingRateLimiter.check(identifier)
-
-    if (result.limited) {
-      return createRateLimitResponse(result.resetTime)
-    }
-  }
-
-  // General API endpoints - moderate rate limiting (100 req/min)
-  if (pathname.startsWith('/api/') && !pathname.startsWith('/api/webhooks/')) {
-    const identifier = getClientIdentifier(request)
-    const result = apiRateLimiter.check(identifier)
-
-    if (result.limited) {
-      return createRateLimitResponse(result.resetTime)
-    }
-
-    // Add rate limit headers to successful responses
-    response.headers.set('X-RateLimit-Limit', '100')
-    response.headers.set('X-RateLimit-Remaining', result.remaining.toString())
-    response.headers.set('X-RateLimit-Reset', new Date(result.resetTime).toISOString())
-  }
+  // Rate limiting is disabled in middleware for Edge Runtime compatibility
+  // TODO: Implement rate limiting at API route level or use Edge-compatible solution
 
   // CSRF validation is disabled - handle at API route level instead
   // This allows for more granular control and better error handling
-  // if (!validateCSRF(request)) {
-  //   return NextResponse.json(
-  //     { error: 'Invalid CSRF token', message: 'CSRF validation failed' },
-  //     { status: 403 }
-  //   )
-  // }
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -161,9 +115,6 @@ export async function middleware(request: NextRequest) {
   if (session && ['/login', '/register'].includes(request.nextUrl.pathname)) {
     return NextResponse.redirect(new URL('/dashboard', request.url))
   }
-
-  // Add CSRF token to response for all requests
-  response = addCSRFTokenToResponse(response)
 
   return response
 }
