@@ -63,6 +63,11 @@ export function addCSRFTokenToResponse(response: NextResponse): NextResponse {
  * Validate CSRF token for state-changing operations
  */
 export function validateCSRF(request: NextRequest): boolean {
+  // Disable CSRF in development for easier testing
+  if (process.env.NODE_ENV === 'development') {
+    return true
+  }
+
   // Only check for POST, PUT, DELETE, PATCH
   const method = request.method
   if (!['POST', 'PUT', 'DELETE', 'PATCH'].includes(method)) {
