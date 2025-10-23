@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { useTenant } from '@/contexts/TenantContext'
+import { useSidebar } from '@/contexts/SidebarContext'
 import {
   HomeIcon,
   ChatBubbleLeftRightIcon,
@@ -13,9 +14,9 @@ import {
   CreditCardIcon,
   ArrowRightOnRectangleIcon,
   BellIcon,
-  MagnifyingGlassIcon,
   Bars3Icon,
   XMarkIcon,
+  SparklesIcon,
 } from '@heroicons/react/24/outline'
 import { toast } from 'react-hot-toast'
 import Link from 'next/link'
@@ -25,15 +26,13 @@ import OrganizationSwitcher from '@/components/OrganizationSwitcher'
 
 interface DashboardLayoutProps {
   children: React.ReactNode
+  hideHeader?: boolean
 }
 
-export default function DashboardLayout({ children }: DashboardLayoutProps) {
+export default function DashboardLayout({ children, hideHeader = false }: DashboardLayoutProps) {
   const [user, setUser] = useState<any>(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
-  const [searchTerm, setSearchTerm] = useState('')
-  const [searchResults, setSearchResults] = useState<any[]>([])
-  const [isSearching, setIsSearching] = useState(false)
+  const { sidebarCollapsed, setSidebarCollapsed } = useSidebar()
   const [showNotifications, setShowNotifications] = useState(false)
   const [notifications, setNotifications] = useState<any[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
@@ -81,49 +80,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     }
     toast.success('Erfolgreich abgemeldet')
     router.push('/login')
-  }
-
-  const handleSearch = async (term: string) => {
-    setSearchTerm(term)
-    if (!term.trim()) {
-      setSearchResults([])
-      setIsSearching(false)
-      return
-    }
-
-    setIsSearching(true)
-    
-    try {
-      // Mock search results - in production, this would search through contacts, messages, etc.
-      const mockResults = [
-        { id: 1, type: 'contact', name: 'Anna Müller', phone: '+49 151 1234567', match: 'contact' },
-        { id: 2, type: 'contact', name: 'Max Schmidt', phone: '+49 152 7654321', match: 'contact' },
-        { id: 3, type: 'message', content: 'Hallo! Wie geht es dir?', contact: 'Anna Müller', match: 'message' },
-        { id: 4, type: 'message', content: 'Danke für die Information', contact: 'Max Schmidt', match: 'message' }
-      ].filter(item => 
-        item.name?.toLowerCase().includes(term.toLowerCase()) ||
-        item.phone?.includes(term) ||
-        item.content?.toLowerCase().includes(term.toLowerCase()) ||
-        item.contact?.toLowerCase().includes(term.toLowerCase())
-      )
-      
-      setSearchResults(mockResults.slice(0, 5)) // Limit to 5 results
-    } catch (error) {
-      console.error('Search failed:', error)
-      setSearchResults([])
-    } finally {
-      setIsSearching(false)
-    }
-  }
-
-  const handleSearchSelect = (result: any) => {
-    if (result.type === 'contact') {
-      router.push('/dashboard/contacts')
-    } else if (result.type === 'message') {
-      router.push('/dashboard/chat')
-    }
-    setSearchTerm('')
-    setSearchResults([])
   }
 
   const loadNotifications = () => {
@@ -257,6 +213,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
   const navigation = [
     { name: 'Dashboard', href: '/dashboard', icon: HomeIcon },
+    { name: 'Nexus AI', href: '/dashboard/nexus-ai', icon: SparklesIcon },
     { name: 'Chat', href: '/dashboard/chat', icon: ChatBubbleLeftRightIcon },
     { name: 'Kontakte', href: '/dashboard/contacts', icon: UserGroupIcon },
     { name: 'Analytics', href: '/dashboard/analytics', icon: ChartBarIcon },
@@ -355,10 +312,12 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               </button>
             </div>
 
-            {/* Organization Switcher */}
-            <div className="px-3 sm:px-4 py-3">
-              <OrganizationSwitcher />
-            </div>
+            {/* Organization Switcher - nur bei ausgeklappter Sidebar */}
+            {!sidebarCollapsed && (
+              <div className="px-3 sm:px-4 py-3">
+                <OrganizationSwitcher />
+              </div>
+            )}
 
             <nav className="flex-1 px-3 sm:px-4 space-y-2 sm:space-y-3">
               {navigation.map((item) => (
@@ -474,73 +433,13 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       <div className={`flex flex-col flex-1 transition-all duration-300 ${
         sidebarCollapsed ? 'md:pl-20' : 'md:pl-64 lg:pl-72 xl:pl-80'
       }`}>
-        <div className="hidden md:block relative z-50">
-          <div className="bg-white/90 dark:bg-gray-800/50 backdrop-blur-xl shadow-lg border-b border-gray-200 dark:border-gray-700/50">
-            <div className="px-4 sm:px-6 md:px-8 lg:px-10 py-4 md:py-6 flex items-center justify-between">
-              <div className="flex-1 flex items-center">
-                <div className="max-w-xs sm:max-w-md w-full lg:max-w-sm xl:max-w-md">
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                      <MagnifyingGlassIcon className="h-5 w-5 text-gray-400" />
-                    </div>
-                    <input
-                      className="bg-gray-100 dark:bg-gray-700/50 border border-gray-300 dark:border-gray-600/50 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 pl-10 sm:pl-12 py-3 sm:py-4 text-sm rounded-xl sm:rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-300"
-                      placeholder="Suchen..."
-                      type="search"
-                      value={searchTerm}
-                      onChange={(e) => handleSearch(e.target.value)}
-                    />
-                    
-                    {/* Search Results Dropdown */}
-                    {(searchTerm || searchResults.length > 0) && (
-                      <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-gray-800 rounded-xl sm:rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 z-[60] overflow-hidden animate-scale-in">
-                        {isSearching ? (
-                          <div className="p-6 text-center text-gray-400">
-                            <div className="loading-dots mx-auto mb-3">
-                              <div></div>
-                              <div></div>
-                              <div></div>
-                            </div>
-                            <p className="text-sm">Suche läuft...</p>
-                          </div>
-                        ) : searchResults.length > 0 ? (
-                          <div className="max-h-64 overflow-y-auto custom-scrollbar">
-                            {searchResults.map((result) => (
-                              <button
-                                key={result.id}
-                                onClick={() => handleSearchSelect(result)}
-                                className="w-full px-4 py-3 text-left hover:bg-gray-700/50 flex items-center space-x-3 transition-all duration-300"
-                              >
-                                <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl flex items-center justify-center ${
-                                  result.type === 'contact' ? 'bg-gradient-to-br from-blue-400 to-blue-600' : 'bg-gradient-to-br from-green-400 to-green-600'
-                                }`}>
-                                  {result.type === 'contact' ? (
-                                    <UserGroupIcon className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
-                                  ) : (
-                                    <ChatBubbleLeftRightIcon className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
-                                  )}
-                                </div>
-                                <div className="flex-1">
-                                  <p className="text-sm font-semibold text-white">
-                                    {result.type === 'contact' ? result.name : result.content}
-                                  </p>
-                                  <p className="text-xs text-gray-400">
-                                    {result.type === 'contact' ? result.phone : `Von ${result.contact}`}
-                                  </p>
-                                </div>
-                              </button>
-                            ))}
-                          </div>
-                        ) : searchTerm && (
-                          <div className="p-6 text-center text-gray-400">
-                            <p className="text-sm">Keine Ergebnisse gefunden</p>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
+        {!hideHeader && (
+          <div className="hidden md:block relative z-50">
+            <div className="bg-white/90 dark:bg-gray-800/50 backdrop-blur-xl shadow-lg border-b border-gray-200 dark:border-gray-700/50">
+              <div className="px-4 sm:px-6 md:px-8 lg:px-10 py-4 md:py-6 flex items-center justify-between">
+                <div className="flex-1 flex items-center">
+                  {/* Search bar removed */}
                 </div>
-              </div>
               {/* Notifications temporarily hidden */}
               {/* <div className="flex items-center space-x-4">
                 <div className="relative">
@@ -647,7 +546,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               </div> */}
             </div>
           </div>
-        </div>
+          </div>
+        )}
 
         <main className="flex-1 pb-6 sm:pb-8 relative z-10">
           <div className="px-3 sm:px-4 md:px-6 lg:px-10 py-4 sm:py-6 md:py-8">
