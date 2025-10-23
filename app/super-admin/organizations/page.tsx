@@ -16,7 +16,8 @@ import {
   XCircle,
   Clock,
   CreditCard,
-  Filter
+  Filter,
+  Send
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -46,11 +47,21 @@ export default function OrganizationsPage() {
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [editingOrg, setEditingOrg] = useState<Organization | null>(null)
   const [creating, setCreating] = useState(false)
+  const [updating, setUpdating] = useState(false)
+  const [resendingInvite, setResendingInvite] = useState(false)
   const [formData, setFormData] = useState({
     name: '',
     subscription_plan: 'starter',
     subscription_status: 'trialing',
     owner_email: '',
+    waha_api_url: '',
+    waha_api_key: ''
+  })
+  const [editFormData, setEditFormData] = useState({
+    name: '',
+    subscription_plan: 'starter',
+    subscription_status: 'trialing',
+    billing_email: '',
     waha_api_url: '',
     waha_api_key: ''
   })
@@ -202,6 +213,83 @@ export default function OrganizationsPage() {
       toast.error(error.message)
     } finally {
       setCreating(false)
+    }
+  }
+
+  function openEditModal(org: Organization) {
+    setEditingOrg(org)
+    setEditFormData({
+      name: org.name,
+      subscription_plan: org.subscription_plan,
+      subscription_status: org.subscription_status,
+      billing_email: org.billing_email || '',
+      waha_api_url: '',
+      waha_api_key: ''
+    })
+  }
+
+  async function updateOrganization() {
+    if (!editingOrg) return
+
+    if (!editFormData.name) {
+      toast.error('Name ist erforderlich')
+      return
+    }
+
+    setUpdating(true)
+    try {
+      const response = await fetch(`/api/super-admin/organizations/${editingOrg.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(editFormData),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Fehler beim Aktualisieren der Organisation')
+      }
+
+      toast.success('Organisation erfolgreich aktualisiert')
+      setEditingOrg(null)
+      setEditFormData({
+        name: '',
+        subscription_plan: 'starter',
+        subscription_status: 'trialing',
+        billing_email: '',
+        waha_api_url: '',
+        waha_api_key: ''
+      })
+      await loadOrganizations()
+    } catch (error: any) {
+      console.error('Error updating organization:', error)
+      toast.error(error.message)
+    } finally {
+      setUpdating(false)
+    }
+  }
+
+  async function resendOwnerInvitation(orgId: string) {
+    setResendingInvite(true)
+    try {
+      const response = await fetch(`/api/super-admin/organizations/${orgId}/resend-owner-invitation`, {
+        method: 'POST'
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Fehler beim erneuten Versenden der Einladung')
+      }
+
+      toast.success('Einladung an den Besitzer wurde erfolgreich versendet')
+    } catch (error: any) {
+      console.error('Error resending owner invitation:', error)
+      toast.error(error.message)
+    } finally {
+      setResendingInvite(false)
     }
   }
 
@@ -390,7 +478,7 @@ export default function OrganizationsPage() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <button
-                          onClick={() => setEditingOrg(org)}
+                          onClick={() => openEditModal(org)}
                           className="text-blue-400 hover:text-blue-300 mr-3"
                           title="Bearbeiten"
                         >
@@ -543,20 +631,153 @@ export default function OrganizationsPage() {
         </div>
       )}
 
-      {/* Edit Modal - not yet implemented */}
+      {/* Edit Modal */}
       {editingOrg && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-gray-800 border border-gray-700 rounded-lg max-w-2xl w-full p-6">
-            <h2 className="text-2xl font-bold text-white mb-4">
-              Organisation bearbeiten
-            </h2>
-            <p className="text-gray-400 mb-4">Diese Funktion wird noch implementiert</p>
-            <button
-              onClick={() => setEditingOrg(null)}
-              className="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600"
-            >
-              Schließen
-            </button>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold text-white">Organisation bearbeiten</h2>
+              <button
+                onClick={() => setEditingOrg(null)}
+                className="text-gray-400 hover:text-white"
+              >
+                <XCircle className="h-6 w-6" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {/* Name */}
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Organisationsname *
+                </label>
+                <input
+                  type="text"
+                  value={editFormData.name}
+                  onChange={(e) => setEditFormData(prev => ({ ...prev, name: e.target.value }))}
+                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+
+              {/* Billing Email */}
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Rechnungs-E-Mail
+                </label>
+                <input
+                  type="email"
+                  value={editFormData.billing_email}
+                  onChange={(e) => setEditFormData(prev => ({ ...prev, billing_email: e.target.value }))}
+                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="z.B. billing@example.com"
+                />
+              </div>
+
+              {/* WAHA API URL */}
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  WAHA API URL
+                </label>
+                <input
+                  type="url"
+                  value={editFormData.waha_api_url}
+                  onChange={(e) => setEditFormData(prev => ({ ...prev, waha_api_url: e.target.value }))}
+                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="https://waha.devlike.pro"
+                />
+                <p className="text-xs text-gray-400 mt-1">
+                  Leer lassen, um die aktuelle URL zu behalten
+                </p>
+              </div>
+
+              {/* WAHA API Key */}
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  WAHA API Key
+                </label>
+                <input
+                  type="text"
+                  value={editFormData.waha_api_key}
+                  onChange={(e) => setEditFormData(prev => ({ ...prev, waha_api_key: e.target.value }))}
+                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="API Key für WAHA"
+                />
+                <p className="text-xs text-gray-400 mt-1">
+                  Leer lassen, um den aktuellen Key zu behalten
+                </p>
+              </div>
+
+              {/* Subscription Plan */}
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Subscription Plan
+                </label>
+                <select
+                  value={editFormData.subscription_plan}
+                  onChange={(e) => setEditFormData(prev => ({ ...prev, subscription_plan: e.target.value }))}
+                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="starter">Starter</option>
+                  <option value="professional">Professional</option>
+                  <option value="business">Business</option>
+                  <option value="enterprise">Enterprise</option>
+                </select>
+              </div>
+
+              {/* Subscription Status */}
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Subscription Status
+                </label>
+                <select
+                  value={editFormData.subscription_status}
+                  onChange={(e) => setEditFormData(prev => ({ ...prev, subscription_status: e.target.value }))}
+                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="trialing">Testphase</option>
+                  <option value="active">Aktiv</option>
+                  <option value="canceled">Gekündigt</option>
+                  <option value="past_due">Überfällig</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="space-y-3 mt-6 pt-6 border-t border-gray-700">
+              {editingOrg?.owner_email && (
+                <div className="flex items-center justify-between p-3 bg-gray-700/50 rounded-lg">
+                  <div>
+                    <div className="text-sm text-white font-medium">Besitzer</div>
+                    <div className="text-xs text-gray-400">{editingOrg.owner_email}</div>
+                  </div>
+                  <button
+                    onClick={() => resendOwnerInvitation(editingOrg.id)}
+                    disabled={resendingInvite}
+                    className="px-3 py-1.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm inline-flex items-center gap-2"
+                    title="Einladung an Besitzer erneut versenden"
+                  >
+                    <Send className="h-4 w-4" />
+                    {resendingInvite ? 'Wird gesendet...' : 'Einladung senden'}
+                  </button>
+                </div>
+              )}
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setEditingOrg(null)}
+                  className="flex-1 px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors"
+                  disabled={updating}
+                >
+                  Abbrechen
+                </button>
+                <button
+                  onClick={updateOrganization}
+                  disabled={updating || !editFormData.name}
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {updating ? 'Aktualisieren...' : 'Änderungen speichern'}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
