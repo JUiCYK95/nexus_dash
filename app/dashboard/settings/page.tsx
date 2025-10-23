@@ -341,15 +341,16 @@ export default function SettingsPage() {
 
     try {
       if (isPendingOrExpired) {
-        // Delete the invitation
-        const { error } = await supabase
-          .from('organization_invitations')
-          .delete()
-          .eq('id', memberId)
+        // Delete the invitation via API route
+        const response = await fetchWithOrg(`/api/team/invitations/${memberId}`, {
+          method: 'DELETE'
+        })
 
-        if (error) {
-          console.error('Error removing invitation:', error)
-          toast.error('Fehler beim Entfernen der Einladung')
+        const data = await response.json()
+
+        if (!response.ok || !data.success) {
+          console.error('Error removing invitation:', data.error)
+          toast.error(data.error || 'Fehler beim Entfernen der Einladung')
           return
         }
 
