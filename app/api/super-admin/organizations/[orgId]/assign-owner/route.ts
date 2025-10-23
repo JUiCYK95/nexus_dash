@@ -86,6 +86,9 @@ export async function POST(
         const expiresAt = new Date()
         expiresAt.setDate(expiresAt.getDate() + 7)
 
+        // Generate a unique token for the invitation
+        const token = crypto.randomUUID()
+
         const { data: invitation, error: inviteError } = await supabaseAdmin
           .from('organization_invitations')
           .insert({
@@ -93,9 +96,10 @@ export async function POST(
             email: ownerEmail,
             role: 'owner',
             invited_by: user.id,
-            expires_at: expiresAt.toISOString()
+            expires_at: expiresAt.toISOString(),
+            token: token
           })
-          .select('id')
+          .select('id, token')
           .single()
 
         if (inviteError) {
@@ -104,7 +108,7 @@ export async function POST(
         }
 
         // Send invitation email
-        await sendInvitationEmail(ownerEmail, org.name, invitation.id)
+        await sendInvitationEmail(ownerEmail, org.name, invitation.token)
 
         return NextResponse.json({
           success: true,
