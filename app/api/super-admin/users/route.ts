@@ -6,7 +6,7 @@ import { createServerClient } from '@supabase/ssr'
 export async function GET(request: NextRequest) {
   try {
     // First check if user is authenticated and is super admin
-    const cookieStore = cookies()
+    const cookieStore = await cookies()
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
