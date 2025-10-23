@@ -327,27 +327,53 @@ export default function SettingsPage() {
       return
     }
 
-    if (!confirm('Sind Sie sicher, dass Sie dieses Mitglied entfernen möchten?')) {
+    // Find the member to check if it's a pending invitation
+    const teamMember = teamMembers.find(m => m.id === memberId)
+    const isPendingOrExpired = teamMember?.status === 'pending' || teamMember?.status === 'expired'
+
+    const confirmMessage = isPendingOrExpired
+      ? 'Sind Sie sicher, dass Sie diese Einladung entfernen möchten?'
+      : 'Sind Sie sicher, dass Sie dieses Mitglied entfernen möchten?'
+
+    if (!confirm(confirmMessage)) {
       return
     }
 
     try {
-      const { error } = await supabase
-        .from('organization_members')
-        .update({ is_active: false })
-        .eq('id', memberId)
+      if (isPendingOrExpired) {
+        // Delete the invitation
+        const { error } = await supabase
+          .from('organization_invitations')
+          .delete()
+          .eq('id', memberId)
 
-      if (error) {
-        console.error('Error removing member:', error)
-        toast.error('Fehler beim Entfernen des Mitglieds')
-        return
+        if (error) {
+          console.error('Error removing invitation:', error)
+          toast.error('Fehler beim Entfernen der Einladung')
+          return
+        }
+
+        toast.success('Einladung erfolgreich entfernt')
+      } else {
+        // Deactivate active member
+        const { error } = await supabase
+          .from('organization_members')
+          .update({ is_active: false })
+          .eq('id', memberId)
+
+        if (error) {
+          console.error('Error removing member:', error)
+          toast.error('Fehler beim Entfernen des Mitglieds')
+          return
+        }
+
+        toast.success('Mitglied erfolgreich entfernt')
       }
 
-      toast.success('Mitglied erfolgreich entfernt')
       loadTeamMembers()
     } catch (error) {
       console.error('Error removing member:', error)
-      toast.error('Fehler beim Entfernen des Mitglieds')
+      toast.error('Fehler beim Entfernen')
     }
   }
 
@@ -704,17 +730,47 @@ export default function SettingsPage() {
                   </div>
                 ) : teamMembers.length > 0 ? (
                   teamMembers.map((teamMember) => (
-                    <div key={teamMember.id} className="flex items-center justify-between p-4 border border-gray-700/50 rounded-lg">
+                    <div key={teamMember.id} className={`flex items-center justify-between p-4 border rounded-lg ${
+                      teamMember.status === 'pending'
+                        ? 'border-yellow-500/50 bg-yellow-900/10'
+                        : teamMember.status === 'expired'
+                        ? 'border-red-500/50 bg-red-900/10 opacity-60'
+                        : 'border-gray-700/50'
+                    }`}>
                       <div className="flex items-center space-x-3">
-                        <div className="w-10 h-10 bg-gradient-cosmic rounded-xl flex items-center justify-center">
-                          <span className="text-white font-bold">
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                          teamMember.status === 'pending'
+                            ? 'bg-yellow-500/20 border border-yellow-500/50'
+                            : teamMember.status === 'expired'
+                            ? 'bg-red-500/20 border border-red-500/50'
+                            : 'bg-gradient-cosmic'
+                        }`}>
+                          <span className={`font-bold ${
+                            teamMember.status === 'pending'
+                              ? 'text-yellow-400'
+                              : teamMember.status === 'expired'
+                              ? 'text-red-400'
+                              : 'text-white'
+                          }`}>
                             {(teamMember.name || teamMember.email || 'U').substring(0, 2).toUpperCase()}
                           </span>
                         </div>
                         <div>
-                          <p className="font-medium text-white">
-                            {teamMember.name || teamMember.email || `User ${teamMember.userId?.substring(0, 8)}`}
-                          </p>
+                          <div className="flex items-center space-x-2">
+                            <p className="font-medium text-white">
+                              {teamMember.name || teamMember.email || `User ${teamMember.userId?.substring(0, 8)}`}
+                            </p>
+                            {teamMember.status === 'pending' && (
+                              <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-yellow-500/20 text-yellow-400 border border-yellow-500/50">
+                                Ausstehend
+                              </span>
+                            )}
+                            {teamMember.status === 'expired' && (
+                              <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 border border-red-500/50">
+                                Abgelaufen
+                              </span>
+                            )}
+                          </div>
                           <p className="text-xs text-gray-500">
                             {teamMember.email}
                           </p>
@@ -723,7 +779,10 @@ export default function SettingsPage() {
                               {getRoleDisplayName(teamMember.role)}
                             </span>
                             <span className="text-xs text-gray-500">
-                              Beigetreten: {new Date(teamMember.joinedAt).toLocaleDateString('de-DE')}
+                              {teamMember.status === 'pending' || teamMember.status === 'expired'
+                                ? `Eingeladen: ${new Date(teamMember.joinedAt).toLocaleDateString('de-DE')}`
+                                : `Beigetreten: ${new Date(teamMember.joinedAt).toLocaleDateString('de-DE')}`
+                              }
                             </span>
                           </div>
                         </div>
@@ -731,22 +790,33 @@ export default function SettingsPage() {
 
                       {canPerform('manage_members') && teamMember.userId !== member?.user_id && (
                         <div className="flex items-center space-x-2">
-                          <select
-                            value={teamMember.role}
-                            onChange={(e) => updateMemberRole(teamMember.id, e.target.value)}
-                            className="text-sm border border-gray-700/50 rounded-md px-2 py-1 bg-gray-800/50 text-white"
-                          >
-                            <option value="viewer">Viewer</option>
-                            <option value="member">Mitglied</option>
-                            <option value="admin">Admin</option>
-                            {member?.role === 'owner' && <option value="owner">Besitzer</option>}
-                          </select>
-                          <button
-                            onClick={() => removeMember(teamMember.id)}
-                            className="p-2 text-red-600 hover:bg-red-900/20 rounded-lg transition-colors"
-                          >
-                            <TrashIcon className="h-4 w-4" />
-                          </button>
+                          {teamMember.status === 'active' ? (
+                            <>
+                              <select
+                                value={teamMember.role}
+                                onChange={(e) => updateMemberRole(teamMember.id, e.target.value)}
+                                className="text-sm border border-gray-700/50 rounded-md px-2 py-1 bg-gray-800/50 text-white"
+                              >
+                                <option value="viewer">Viewer</option>
+                                <option value="member">Mitglied</option>
+                                <option value="admin">Admin</option>
+                                {member?.role === 'owner' && <option value="owner">Besitzer</option>}
+                              </select>
+                              <button
+                                onClick={() => removeMember(teamMember.id)}
+                                className="p-2 text-red-600 hover:bg-red-900/20 rounded-lg transition-colors"
+                              >
+                                <TrashIcon className="h-4 w-4" />
+                              </button>
+                            </>
+                          ) : (
+                            <button
+                              onClick={() => removeMember(teamMember.id)}
+                              className="px-3 py-1 text-sm text-red-600 hover:bg-red-900/20 rounded-lg transition-colors"
+                            >
+                              {teamMember.status === 'expired' ? 'Entfernen' : 'Einladung widerrufen'}
+                            </button>
+                          )}
                         </div>
                       )}
                     </div>

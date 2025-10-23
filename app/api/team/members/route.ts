@@ -96,10 +96,52 @@ export async function GET(request: NextRequest) {
           role: member.role,
           joinedAt: member.joined_at,
           isActive: member.is_active,
+          status: 'active'
         }
       })
 
-      return createApiResponse(true, { members: formattedMembers })
+      // Fetch pending invitations
+      const { data: invitations, error: invitationsError } = await supabase
+        .from('organization_invitations')
+        .select(`
+          id,
+          email,
+          role,
+          invited_by,
+          created_at,
+          expires_at
+        `)
+        .eq('organization_id', organizationId)
+        .is('accepted_at', null)
+        .order('created_at', { ascending: false })
+
+      if (invitationsError) {
+        console.error('Error fetching invitations:', invitationsError)
+      }
+
+      // Format pending invitations
+      const formattedInvitations = (invitations || []).map(invitation => {
+        const now = new Date()
+        const expiresAt = new Date(invitation.expires_at)
+        const isExpired = expiresAt < now
+
+        return {
+          id: invitation.id,
+          email: invitation.email,
+          name: invitation.email.split('@')[0], // Use email prefix as name
+          role: invitation.role,
+          joinedAt: invitation.created_at,
+          invitedBy: invitation.invited_by,
+          expiresAt: invitation.expires_at,
+          isActive: false,
+          status: isExpired ? 'expired' : 'pending'
+        }
+      })
+
+      // Combine members and pending invitations
+      const allMembers = [...formattedMembers, ...formattedInvitations]
+
+      return createApiResponse(true, { members: allMembers })
 
     } catch (error) {
       console.error('Team members API error:', error)
