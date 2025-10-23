@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, memo } from 'react'
 import {
   ChatBubbleLeftRightIcon,
   UserPlusIcon,
@@ -10,7 +10,7 @@ import {
 import { useRouter } from 'next/navigation'
 import { fetchWithOrg } from '@/lib/api-utils'
 
-export default function RecentActivity() {
+function RecentActivity() {
   const [activities, setActivities] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const router = useRouter()
@@ -134,3 +134,5 @@ export default function RecentActivity() {
     </div>
   )
 }
+
+export default memo(RecentActivity)

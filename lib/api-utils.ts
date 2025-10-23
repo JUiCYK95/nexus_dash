@@ -1,3 +1,5 @@
+import { getCSRFToken } from './csrf-client'
+
 /**
  * Helper function to make API calls with the current organization ID header
  */
@@ -7,23 +9,38 @@ export function getOrgHeaders(): HeadersInit {
   }
 
   const currentOrgId = localStorage.getItem('current_organization_id')
-  console.log('🔑 Organization Header:', currentOrgId) // Debug log
   return currentOrgId ? {
     'x-organization-id': currentOrgId
   } : {}
 }
 
 /**
- * Fetch wrapper that automatically includes organization header
+ * Get CSRF token header
+ */
+function getCSRFHeaders(): HeadersInit {
+  if (typeof window === 'undefined') {
+    return {}
+  }
+
+  const csrfToken = getCSRFToken()
+  return csrfToken ? {
+    'x-csrf-token': csrfToken
+  } : {}
+}
+
+/**
+ * Fetch wrapper that automatically includes organization header and CSRF token
  */
 export async function fetchWithOrg(url: string, options?: RequestInit): Promise<Response> {
   const orgHeaders = getOrgHeaders()
+  const csrfHeaders = getCSRFHeaders()
 
   return fetch(url, {
     ...options,
     headers: {
       ...options?.headers,
-      ...orgHeaders, // Put orgHeaders last so it overrides any existing x-organization-id
+      ...orgHeaders,
+      ...csrfHeaders, // Add CSRF token for POST/PUT/DELETE/PATCH
     }
   })
 }

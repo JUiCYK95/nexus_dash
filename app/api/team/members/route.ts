@@ -13,7 +13,9 @@ import {
   handleApiError
 } from '@/lib/api-middleware'
 import { logAuditEvent, canManageRole } from '@/lib/permissions'
+import { randomBytes } from 'crypto'
 import { MemberRole } from '@/types/tenant'
+import { inviteMemberSchema, validateRequestBody } from '@/lib/validation-schemas'
 
 // =============================================
 // GET TEAM MEMBERS
@@ -45,60 +47,57 @@ export async function GET(request: NextRequest) {
         return createApiResponse(false, undefined, 'Failed to fetch team members', 500)
       }
 
-      // Get auth user data for all team members
+      // OPTIMIZED: Fetch all user data in a single query (fixes N+1 problem)
       const userIds = members?.map(m => m.user_id) || []
-      const formattedMembers: any[] = []
 
-      for (const member of members || []) {
+      // Create a map of userId -> user data for fast lookup
+      const userDataMap = new Map<string, { email: string; name: string }>()
+
+      if (userIds.length > 0) {
         try {
-          // Get user data from auth.users using admin client
-          const { data: { user: authUser }, error: authError } = await supabaseAdmin.auth.admin.getUserById(member.user_id)
+          // Fetch all users in a single query
+          const { data: { users }, error: usersError } = await supabaseAdmin.auth.admin.listUsers()
 
-          let email = 'Unknown'
-          let name = 'Unknown'
+          if (!usersError && users) {
+            // Filter to only the users we need and build the map
+            users
+              .filter(user => userIds.includes(user.id))
+              .forEach(authUser => {
+                const metadata = authUser.user_metadata || {}
+                const rawMetadata = (authUser as any).raw_user_meta_data || {}
+                const email = authUser.email || 'Unknown'
 
-          if (authUser && !authError) {
-            email = authUser.email || 'Unknown'
+                // Try multiple metadata fields for the name
+                const name = metadata.full_name ||
+                       metadata.name ||
+                       metadata.display_name ||
+                       rawMetadata.full_name ||
+                       rawMetadata.name ||
+                       rawMetadata.display_name ||
+                       email.split('@')[0]
 
-            // Try to get name from both user_metadata and raw_user_meta_data
-            const metadata = authUser.user_metadata || {}
-            const rawMetadata = (authUser as any).raw_user_meta_data || {}
-
-            // Try multiple metadata fields for the name
-            name = metadata.full_name ||
-                   metadata.name ||
-                   metadata.display_name ||
-                   rawMetadata.full_name ||
-                   rawMetadata.name ||
-                   rawMetadata.display_name ||
-                   email.split('@')[0]
-          } else {
-            console.error(`Error fetching user ${member.user_id}:`, authError)
+                userDataMap.set(authUser.id, { email, name })
+              })
           }
-
-          formattedMembers.push({
-            id: member.id,
-            userId: member.user_id,
-            email,
-            name,
-            role: member.role,
-            joinedAt: member.joined_at,
-            isActive: member.is_active,
-          })
-        } catch (error) {
-          console.error(`Failed to fetch user ${member.user_id}:`, error)
-          // Add member with unknown data
-          formattedMembers.push({
-            id: member.id,
-            userId: member.user_id,
-            email: 'Unknown',
-            name: 'Unknown',
-            role: member.role,
-            joinedAt: member.joined_at,
-            isActive: member.is_active,
-          })
+        } catch (err) {
+          console.error('Error fetching users in bulk:', err)
         }
       }
+
+      // Map members with user data from our pre-fetched map
+      const formattedMembers = (members || []).map(member => {
+        const userData = userDataMap.get(member.user_id) || { email: 'Unknown', name: 'Unknown' }
+
+        return {
+          id: member.id,
+          userId: member.user_id,
+          email: userData.email,
+          name: userData.name,
+          role: member.role,
+          joinedAt: member.joined_at,
+          isActive: member.is_active,
+        }
+      })
 
       return createApiResponse(true, { members: formattedMembers })
 
@@ -116,17 +115,16 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   return withPermission('manage_members')(request, async (req: AuthenticatedRequest) => {
     try {
-      const { email, role } = await request.json()
+      const body = await request.json()
       const { userId, organizationId } = req.auth!
 
-      // Validate input
-      if (!email || !role) {
-        return createApiResponse(false, undefined, 'Email and role are required', 400)
+      // Validate request body
+      const validation = await validateRequestBody(body, inviteMemberSchema)
+      if (!validation.success) {
+        return createApiResponse(false, undefined, validation.error, 400)
       }
 
-      if (!['viewer', 'member', 'admin'].includes(role)) {
-        return createApiResponse(false, undefined, 'Invalid role', 400)
-      }
+      const { email, role, permissions } = validation.data
 
       const supabase = createServerSupabaseClient(request)
 
@@ -218,9 +216,8 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // Generate invitation token
-      const token = Math.random().toString(36).substring(2, 15) + 
-                   Math.random().toString(36).substring(2, 15)
+      // Generate cryptographically secure invitation token
+      const token = randomBytes(32).toString('hex')
 
       // Create invitation
       const { error: inviteError } = await supabase

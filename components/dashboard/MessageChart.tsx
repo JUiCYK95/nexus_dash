@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, memo } from 'react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts'
 import { fetchWithOrg } from '@/lib/api-utils'
 
@@ -8,7 +8,7 @@ interface MessageChartProps {
   period?: number
 }
 
-export default function MessageChart({ period = 7 }: MessageChartProps) {
+function MessageChart({ period = 7 }: MessageChartProps) {
   const [data, setData] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -183,3 +183,5 @@ export default function MessageChart({ period = 7 }: MessageChartProps) {
     </div>
   )
 }
+
+export default memo(MessageChart)

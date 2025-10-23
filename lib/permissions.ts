@@ -5,6 +5,7 @@
 import { createClient } from '@/lib/supabase'
 import { createServerSupabaseClient } from '@/lib/supabase-server'
 import { MemberRole, MemberPermissions, DEFAULT_PERMISSIONS } from '@/types/tenant'
+import { randomBytes } from 'crypto'
 
 type Permission = keyof MemberPermissions
 
@@ -387,8 +388,8 @@ export async function createInvitation(
 }
 
 function generateInvitationToken(): string {
-  return Math.random().toString(36).substring(2, 15) + 
-         Math.random().toString(36).substring(2, 15)
+  // Generate cryptographically secure random token (32 bytes = 64 hex characters)
+  return randomBytes(32).toString('hex')
 }
 
 // =============================================

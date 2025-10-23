@@ -8,6 +8,7 @@ import {
   handleApiError
 } from '@/lib/api-middleware'
 import { enforceUsageLimit, trackUsage } from '@/lib/usage-tracker'
+import { sendMessageSchema, validateRequestBody } from '@/lib/validation-schemas'
 
 export async function POST(request: NextRequest) {
   return withApiProtection({
@@ -17,12 +18,15 @@ export async function POST(request: NextRequest) {
   })(request, async (req: AuthenticatedRequest) => {
     try {
       const body = await request.json()
-      const { contactId, message, sessionName = 'default', phoneNumber } = body
-      const { userId, organizationId } = req.auth!
 
-      if (!contactId || !message) {
-        return createApiResponse(false, undefined, 'Contact ID and message are required', 400)
+      // Validate request body
+      const validation = await validateRequestBody(body, sendMessageSchema)
+      if (!validation.success) {
+        return createApiResponse(false, undefined, validation.error, 400)
       }
+
+      const { contactId, message, phoneNumber } = validation.data
+      const { userId, organizationId } = req.auth!
 
       // Check usage limits before sending
       const usageCheck = await enforceUsageLimit(organizationId, 'messages_sent', 1)
@@ -33,18 +37,8 @@ export async function POST(request: NextRequest) {
 
       const supabase = createServerSupabaseClient(request)
 
-      // Get contact information if phoneNumber not provided
-      let targetPhone = phoneNumber
-      if (!targetPhone && contactId) {
-        const { data: contact } = await supabase
-          .from('contacts')
-          .select('phone_number')
-          .eq('id', contactId)
-          .eq('organization_id', organizationId)
-          .single()
-
-        targetPhone = contact?.phone_number
-      }
+      // phoneNumber is always provided now (from validation)
+      const targetPhone = phoneNumber
 
       if (!targetPhone) {
         return createApiResponse(false, undefined, 'Phone number not found for contact', 404)

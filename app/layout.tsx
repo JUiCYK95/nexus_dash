@@ -3,6 +3,7 @@ import './globals.css'
 import { Toaster } from 'react-hot-toast'
 import { TenantProvider } from '@/contexts/TenantContext'
 import { ThemeProvider } from '@/components/ThemeProvider'
+import ErrorBoundary from '@/components/ErrorBoundary'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -24,21 +25,23 @@ export default function RootLayout({
   return (
     <html lang="de">
       <body className={inter.className}>
-        <ThemeProvider>
-          <TenantProvider>
-            <Toaster
-              position="top-right"
-              toastOptions={{
-                duration: 4000,
-                style: {
-                  background: '#363636',
-                  color: '#fff',
-                },
-              }}
-            />
-            {children}
-          </TenantProvider>
-        </ThemeProvider>
+        <ErrorBoundary>
+          <ThemeProvider>
+            <TenantProvider>
+              <Toaster
+                position="top-right"
+                toastOptions={{
+                  duration: 4000,
+                  style: {
+                    background: '#363636',
+                    color: '#fff',
+                  },
+                }}
+              />
+              {children}
+            </TenantProvider>
+          </ThemeProvider>
+        </ErrorBoundary>
       </body>
     </html>
   )

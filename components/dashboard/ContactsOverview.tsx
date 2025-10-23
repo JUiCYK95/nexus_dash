@@ -1,11 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, memo } from 'react'
 import { UserIcon, PhoneIcon } from '@heroicons/react/24/outline'
 import { useRouter } from 'next/navigation'
 import { fetchWithOrg } from '@/lib/api-utils'
 
-export default function ContactsOverview() {
+function ContactsOverview() {
   const [contacts, setContacts] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const router = useRouter()
@@ -104,3 +104,5 @@ export default function ContactsOverview() {
     </div>
   )
 }
+
+export default memo(ContactsOverview)
