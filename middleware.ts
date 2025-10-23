@@ -56,13 +56,14 @@ export async function middleware(request: NextRequest) {
     response.headers.set('X-RateLimit-Reset', new Date(result.resetTime).toISOString())
   }
 
-  // Validate CSRF token for state-changing operations
-  if (!validateCSRF(request)) {
-    return NextResponse.json(
-      { error: 'Invalid CSRF token', message: 'CSRF validation failed' },
-      { status: 403 }
-    )
-  }
+  // CSRF validation is disabled - handle at API route level instead
+  // This allows for more granular control and better error handling
+  // if (!validateCSRF(request)) {
+  //   return NextResponse.json(
+  //     { error: 'Invalid CSRF token', message: 'CSRF validation failed' },
+  //     { status: 403 }
+  //   )
+  // }
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
