@@ -1,11 +1,14 @@
-import { randomBytes } from 'crypto'
 import { NextRequest, NextResponse } from 'next/server'
 
 /**
- * Generate a cryptographically secure CSRF token
+ * Generate a cryptographically secure CSRF token using Web Crypto API
+ * Compatible with Edge Runtime
  */
 export function generateCSRFToken(): string {
-  return randomBytes(32).toString('hex')
+  // Use Web Crypto API which is available in Edge Runtime
+  const array = new Uint8Array(32)
+  crypto.getRandomValues(array)
+  return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('')
 }
 
 /**
