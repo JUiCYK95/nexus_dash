@@ -743,21 +743,25 @@ export default function OrganizationsPage() {
             </div>
 
             <div className="space-y-3 mt-6 pt-6 border-t border-gray-700">
-              {editingOrg?.owner_email && (
+              {editingOrg && (
                 <div className="flex items-center justify-between p-3 bg-gray-700/50 rounded-lg">
                   <div>
                     <div className="text-sm text-white font-medium">Besitzer</div>
-                    <div className="text-xs text-gray-400">{editingOrg.owner_email}</div>
+                    <div className="text-xs text-gray-400">
+                      {editingOrg.owner_email || 'Kein Besitzer zugeordnet'}
+                    </div>
                   </div>
-                  <button
-                    onClick={() => resendOwnerInvitation(editingOrg.id)}
-                    disabled={resendingInvite}
-                    className="px-3 py-1.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm inline-flex items-center gap-2"
-                    title="Einladung an Besitzer erneut versenden"
-                  >
-                    <Send className="h-4 w-4" />
-                    {resendingInvite ? 'Wird gesendet...' : 'Einladung senden'}
-                  </button>
+                  {editingOrg.owner_email && (
+                    <button
+                      onClick={() => resendOwnerInvitation(editingOrg.id)}
+                      disabled={resendingInvite}
+                      className="px-3 py-1.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm inline-flex items-center gap-2"
+                      title="Einladung an Besitzer erneut versenden"
+                    >
+                      <Send className="h-4 w-4" />
+                      {resendingInvite ? 'Wird gesendet...' : 'Einladung senden'}
+                    </button>
+                  )}
                 </div>
               )}
 
