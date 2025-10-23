@@ -216,6 +216,54 @@ export default function UsersPage() {
     }
   }
 
+  async function deleteUser(userId: string, userName: string) {
+    if (!confirm(`Möchten Sie den Benutzer "${userName}" wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.`)) {
+      return
+    }
+
+    try {
+      const response = await fetch(`/api/super-admin/users/${userId}/delete`, {
+        method: 'DELETE'
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Fehler beim Löschen des Benutzers')
+      }
+
+      toast.success('Benutzer erfolgreich gelöscht')
+      await loadUsers()
+    } catch (error: any) {
+      console.error('Error deleting user:', error)
+      toast.error(error.message)
+    }
+  }
+
+  async function revokeInvitation(invitationId: string, email: string) {
+    if (!confirm(`Möchten Sie die Einladung für "${email}" wirklich widerrufen?`)) {
+      return
+    }
+
+    try {
+      const response = await fetch(`/api/super-admin/invitations/${invitationId}/delete`, {
+        method: 'DELETE'
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Fehler beim Widerrufen der Einladung')
+      }
+
+      toast.success('Einladung erfolgreich widerrufen')
+      await loadUsers()
+    } catch (error: any) {
+      console.error('Error revoking invitation:', error)
+      toast.error(error.message)
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -445,26 +493,46 @@ export default function UsersPage() {
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <div className="flex items-center justify-end gap-2">
                           {(user.status === 'pending' || user.status === 'expired') && user.invitation_id ? (
-                            <button
-                              onClick={() => resendInvitation(user.invitation_id!)}
-                              className="px-3 py-1 rounded text-xs font-medium bg-purple-500/20 text-purple-400 hover:bg-purple-500/30 border border-purple-500/30 inline-flex items-center gap-1"
-                              title="Einladung erneut versenden"
-                            >
-                              <RefreshCw className="h-3 w-3" />
-                              Erneut senden
-                            </button>
+                            <>
+                              <button
+                                onClick={() => resendInvitation(user.invitation_id!)}
+                                className="px-3 py-1 rounded text-xs font-medium bg-purple-500/20 text-purple-400 hover:bg-purple-500/30 border border-purple-500/30 inline-flex items-center gap-1"
+                                title="Einladung erneut versenden"
+                              >
+                                <RefreshCw className="h-3 w-3" />
+                                Erneut senden
+                              </button>
+                              <button
+                                onClick={() => revokeInvitation(user.invitation_id!, user.email)}
+                                className="px-3 py-1 rounded text-xs font-medium bg-red-500/20 text-red-400 hover:bg-red-500/30 border border-red-500/30 inline-flex items-center gap-1"
+                                title="Einladung widerrufen"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                                Widerrufen
+                              </button>
+                            </>
                           ) : (
-                            <button
-                              onClick={() => toggleSuperAdmin(user.id, user.is_super_admin)}
-                              className={`px-3 py-1 rounded text-xs font-medium ${
-                                user.is_super_admin
-                                  ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30 border border-red-500/30'
-                                  : 'bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 border border-blue-500/30'
-                              }`}
-                              title={user.is_super_admin ? 'Super Admin entfernen' : 'Zu Super Admin machen'}
-                            >
-                              {user.is_super_admin ? 'Admin entfernen' : 'Admin machen'}
-                            </button>
+                            <>
+                              <button
+                                onClick={() => toggleSuperAdmin(user.id, user.is_super_admin)}
+                                className={`px-3 py-1 rounded text-xs font-medium ${
+                                  user.is_super_admin
+                                    ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30 border border-red-500/30'
+                                    : 'bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 border border-blue-500/30'
+                                }`}
+                                title={user.is_super_admin ? 'Super Admin entfernen' : 'Zu Super Admin machen'}
+                              >
+                                {user.is_super_admin ? 'Admin entfernen' : 'Admin machen'}
+                              </button>
+                              <button
+                                onClick={() => deleteUser(user.id, user.raw_user_meta_data?.full_name || user.email)}
+                                className="px-3 py-1 rounded text-xs font-medium bg-red-500/20 text-red-400 hover:bg-red-500/30 border border-red-500/30 inline-flex items-center gap-1"
+                                title="Benutzer löschen"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                                Löschen
+                              </button>
+                            </>
                           )}
                         </div>
                       </td>
