@@ -789,7 +789,7 @@ export default function SettingsPage() {
                         </div>
                       </div>
 
-                      {canPerform('manage_members') && teamMember.userId !== member?.user_id && (
+                      {canPerform('manage_members') && (teamMember.status !== 'active' || teamMember.userId !== member?.user_id) && (
                         <div className="flex items-center space-x-2">
                           {teamMember.status === 'active' ? (
                             <>
