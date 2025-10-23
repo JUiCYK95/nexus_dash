@@ -49,6 +49,10 @@ export default function OrganizationsPage() {
   const [creating, setCreating] = useState(false)
   const [updating, setUpdating] = useState(false)
   const [resendingInvite, setResendingInvite] = useState(false)
+  const [assigningOwner, setAssigningOwner] = useState(false)
+  const [showOwnerInput, setShowOwnerInput] = useState(false)
+  const [newOwnerEmail, setNewOwnerEmail] = useState('')
+  const [allUsers, setAllUsers] = useState<Array<{ id: string; email: string; name: string }>>([])
   const [formData, setFormData] = useState({
     name: '',
     subscription_plan: 'starter',
@@ -68,6 +72,7 @@ export default function OrganizationsPage() {
 
   useEffect(() => {
     checkSuperAdmin()
+    loadAllUsers()
   }, [])
 
   useEffect(() => {
@@ -116,6 +121,26 @@ export default function OrganizationsPage() {
       toast.error('Fehler beim Laden der Organisationen')
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function loadAllUsers() {
+    try {
+      const response = await fetch('/api/super-admin/users')
+      if (!response.ok) return
+
+      const { users } = await response.json()
+      const formattedUsers = users
+        .filter((u: any) => u.status === 'active' && u.email_confirmed_at)
+        .map((u: any) => ({
+          id: u.id,
+          email: u.email,
+          name: u.raw_user_meta_data?.full_name || u.email
+        }))
+
+      setAllUsers(formattedUsers)
+    } catch (error) {
+      console.error('Error loading users:', error)
     }
   }
 
@@ -290,6 +315,43 @@ export default function OrganizationsPage() {
       toast.error(error.message)
     } finally {
       setResendingInvite(false)
+    }
+  }
+
+  async function assignOwner(orgId: string, userIdOrEmail: string) {
+    setAssigningOwner(true)
+    try {
+      const isEmail = userIdOrEmail.includes('@')
+      const payload = isEmail
+        ? { ownerEmail: userIdOrEmail }
+        : { userId: userIdOrEmail }
+
+      const response = await fetch(`/api/super-admin/organizations/${orgId}/assign-owner`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Fehler beim Zuweisen des Besitzers')
+      }
+
+      if (data.invited) {
+        toast.success('Einladung wurde an die E-Mail-Adresse versendet')
+      } else {
+        toast.success('Besitzer erfolgreich zugewiesen')
+      }
+
+      setShowOwnerInput(false)
+      setNewOwnerEmail('')
+      await loadOrganizations()
+    } catch (error: any) {
+      console.error('Error assigning owner:', error)
+      toast.error(error.message)
+    } finally {
+      setAssigningOwner(false)
     }
   }
 
@@ -744,23 +806,83 @@ export default function OrganizationsPage() {
 
             <div className="space-y-3 mt-6 pt-6 border-t border-gray-700">
               {editingOrg && (
-                <div className="flex items-center justify-between p-3 bg-gray-700/50 rounded-lg">
-                  <div>
-                    <div className="text-sm text-white font-medium">Besitzer</div>
-                    <div className="text-xs text-gray-400">
-                      {editingOrg.owner_email || 'Kein Besitzer zugeordnet'}
+                <div className="p-3 bg-gray-700/50 rounded-lg space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="text-sm text-white font-medium">Besitzer</div>
+                      <div className="text-xs text-gray-400">
+                        {editingOrg.owner_email || 'Kein Besitzer zugeordnet'}
+                      </div>
                     </div>
+                    {editingOrg.owner_email ? (
+                      <button
+                        onClick={() => resendOwnerInvitation(editingOrg.id)}
+                        disabled={resendingInvite}
+                        className="px-3 py-1.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm inline-flex items-center gap-2"
+                        title="Einladung an Besitzer erneut versenden"
+                      >
+                        <Send className="h-4 w-4" />
+                        {resendingInvite ? 'Wird gesendet...' : 'Einladung senden'}
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => setShowOwnerInput(!showOwnerInput)}
+                        className="px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm inline-flex items-center gap-2"
+                      >
+                        <Plus className="h-4 w-4" />
+                        Besitzer zuweisen
+                      </button>
+                    )}
                   </div>
-                  {editingOrg.owner_email && (
-                    <button
-                      onClick={() => resendOwnerInvitation(editingOrg.id)}
-                      disabled={resendingInvite}
-                      className="px-3 py-1.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm inline-flex items-center gap-2"
-                      title="Einladung an Besitzer erneut versenden"
-                    >
-                      <Send className="h-4 w-4" />
-                      {resendingInvite ? 'Wird gesendet...' : 'Einladung senden'}
-                    </button>
+
+                  {showOwnerInput && !editingOrg.owner_email && (
+                    <div className="space-y-2 pt-2 border-t border-gray-600">
+                      <div className="text-xs text-gray-400 mb-2">
+                        Wählen Sie einen vorhandenen Benutzer oder geben Sie eine E-Mail ein
+                      </div>
+
+                      <select
+                        onChange={(e) => {
+                          if (e.target.value) {
+                            assignOwner(editingOrg.id, e.target.value)
+                            e.target.value = ''
+                          }
+                        }}
+                        className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        disabled={assigningOwner}
+                      >
+                        <option value="">Vorhandenen Benutzer auswählen...</option>
+                        {allUsers.map(user => (
+                          <option key={user.id} value={user.id}>
+                            {user.name} ({user.email})
+                          </option>
+                        ))}
+                      </select>
+
+                      <div className="text-xs text-gray-400 text-center py-1">oder</div>
+
+                      <div className="flex gap-2">
+                        <input
+                          type="email"
+                          value={newOwnerEmail}
+                          onChange={(e) => setNewOwnerEmail(e.target.value)}
+                          placeholder="neue.email@example.com"
+                          className="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          disabled={assigningOwner}
+                        />
+                        <button
+                          onClick={() => {
+                            if (newOwnerEmail) {
+                              assignOwner(editingOrg.id, newOwnerEmail)
+                            }
+                          }}
+                          disabled={assigningOwner || !newOwnerEmail}
+                          className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                        >
+                          {assigningOwner ? 'Wird zugewiesen...' : 'Einladen'}
+                        </button>
+                      </div>
+                    </div>
                   )}
                 </div>
               )}
